@@ -6,9 +6,9 @@ Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs
 
 This repository is still in very early development.
 
-- The initial project initialization command is implemented.
-- The `ideas` document format and command namespace are specified, but the commands are not implemented yet.
-- `solutions/` and `logs/` are planned as part of the managed research layout.
+- Project initialization is implemented.
+- The `ideas` command namespace is implemented for idea creation, listing, display, abandon, and restore flows.
+- `solutions/` and `logs/` are now created as part of the managed project layout.
 
 ## Why Ameth?
 
@@ -55,8 +55,6 @@ The planned `ideas` workflow is specified in `ideas.md`.
 
 ## TODO
 
-- Implement the `ameth ideas` command namespace.
-- Extend project initialization to create root `solutions/` and `logs/` directories.
 - Define the `solutions/` document workflow in more detail.
 - Keep `logs/` as a placeholder until its workflow is designed.
 
@@ -87,12 +85,13 @@ cargo fmt --check
 
 ## Current CLI
 
-Ameth currently supports project initialization with:
+Ameth currently supports project initialization and idea management with:
 
 ```bash
 ameth
 ameth init <name> [path]
 ameth <name> [path]
+ameth ideas <command>
 ```
 
 Behavior:
@@ -103,15 +102,19 @@ Behavior:
 - `[path]` is the parent directory and defaults to `.`.
 - `ameth <name> [path]` is an alias for `ameth init <name> [path]`.
 - The command fails if `[path]/<name>` already exists.
-- The planned `ameth ideas ...` commands are not implemented yet.
+- `ameth ideas new` creates the next `idea-000N.md` file.
+- `ameth ideas list` lists active ideas and their abstract text.
+- `ameth ideas show <id>` shows an active or abandoned idea.
+- `ameth ideas abandon <id>` moves an idea into `ideas/abandoned/`.
+- `ameth ideas restore <id>` moves an idea back into `ideas/`.
 
-It creates this initial layout:
+It creates this layout:
 
 - `ideas/`
 - `ideas/abandoned/`
+- `solutions/`
+- `logs/`
 - `relevants/`
 - `code/`
 - `experiments/`
 - `ideas/Problem.md`
-
-Planned additions such as `solutions/` and `logs/` are not created by `ameth init` yet.

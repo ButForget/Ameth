@@ -6,7 +6,8 @@ pub const USAGE: &str = "ameth init <name> [path]";
 pub const ALIAS_USAGE: &str = "ameth <name> [path]";
 pub const HELP: &str = "Initialize an Ameth project.\n\nUsage:\n  ameth init <name> [path]\n  ameth <name> [path]\n\nArguments:\n  <name>  Project directory name\n  [path]  Parent directory for the project (defaults to `.`)\n";
 
-const PROBLEM_TEMPLATE: &str = "# Problem\n\n## Context\n\n## Goal\n\n## Constraints\n\n## Notes\n";
+const PROBLEM_TEMPLATE: &str =
+    "# Problem\n\n## Abstract\n\n## Goal\n\n## Constraints\n\n## Open Questions\n";
 
 pub enum Invocation {
     Explicit,
@@ -116,6 +117,10 @@ fn execute(command: &InitCommand) -> Result<(), String> {
     fs::create_dir(&project_root).map_err(|error| format_create_error(&project_root, error))?;
     fs::create_dir_all(project_root.join("ideas/abandoned"))
         .map_err(|error| format_create_error(&project_root.join("ideas/abandoned"), error))?;
+    fs::create_dir(project_root.join("solutions"))
+        .map_err(|error| format_create_error(&project_root.join("solutions"), error))?;
+    fs::create_dir(project_root.join("logs"))
+        .map_err(|error| format_create_error(&project_root.join("logs"), error))?;
     fs::create_dir(project_root.join("relevants"))
         .map_err(|error| format_create_error(&project_root.join("relevants"), error))?;
     fs::create_dir(project_root.join("code"))
