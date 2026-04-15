@@ -6,8 +6,9 @@ Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs
 
 This repository is still in very early development.
 
-- The initial project initialization command is implemented.
-- The idea-management flow beyond project bootstrapping is still in development.
+- Project initialization is implemented.
+- The `ideas` command namespace is implemented for idea creation, listing, display, abandon, and restore flows.
+- `solutions/` and `logs/` are now created as part of the managed project layout.
 
 ## Why Ameth?
 
@@ -22,20 +23,40 @@ Ameth is meant to provide a predictable project structure for research work, so 
 
 ## Intended Project Structure
 
-The current design is centered around a few top-level directories:
+The planned research layout is centered around these top-level directories:
 
 - `ideas/`
+- `solutions/`
+- `logs/`
 - `relevants/`
 - `code/`
 - `experiments/`
 
 ### `ideas/`
 
-The `ideas/` directory is intended to capture the research problem and candidate solutions.
+The `ideas/` directory stores the research problem and raw idea documents.
 
-- `Problem.md` describes the main problem the research focuses on.
-- Idea files follow a naming pattern like `idea-<index>-<time>.md`.
+- `ideas/Problem.md` is the structured anchor for the research problem.
+- Idea files follow a naming pattern like `idea-0001.md`.
 - Abandoned ideas go under `ideas/abandoned/`.
+- `Problem.md` uses fixed machine-parseable sections: `Abstract`, `Goal`, `Constraints`, and `Open Questions`.
+- Idea files use fixed machine-parseable sections: `Abstract` and `Content`.
+- Nested headings are allowed inside the fixed sections, but only at level 3 or deeper.
+
+### `solutions/`
+
+The `solutions/` directory is intended for more structured solution documents promoted from promising ideas.
+
+### `logs/`
+
+The `logs/` directory is reserved for research logs and currently acts as a placeholder.
+
+The planned `ideas` workflow is specified in `ideas.md`.
+
+## TODO
+
+- Define the `solutions/` document workflow in more detail.
+- Keep `logs/` as a placeholder until its workflow is designed.
 
 ## Current Repository Layout
 
@@ -46,6 +67,7 @@ This repo currently contains:
 - `src/cli/` for root CLI dispatch and whole-program help
 - `src/commands/` for per-command parsing, help text, and execution
 - `PROJECT_STATE.md` for a brief project status note
+- `ideas.md` for the planned ideas-management format and command behavior
 
 ## Development
 
@@ -63,12 +85,13 @@ cargo fmt --check
 
 ## Current CLI
 
-Ameth currently supports project initialization with:
+Ameth currently supports project initialization and idea management with:
 
 ```bash
 ameth
 ameth init <name> [path]
 ameth <name> [path]
+ameth ideas <command>
 ```
 
 Behavior:
@@ -79,11 +102,18 @@ Behavior:
 - `[path]` is the parent directory and defaults to `.`.
 - `ameth <name> [path]` is an alias for `ameth init <name> [path]`.
 - The command fails if `[path]/<name>` already exists.
+- `ameth ideas new` creates the next `idea-000N.md` file.
+- `ameth ideas list` lists active ideas and their abstract text.
+- `ameth ideas show <id>` shows an active or abandoned idea.
+- `ameth ideas abandon <id>` moves an idea into `ideas/abandoned/`.
+- `ameth ideas restore <id>` moves an idea back into `ideas/`.
 
-It creates this initial layout:
+It creates this layout:
 
 - `ideas/`
 - `ideas/abandoned/`
+- `solutions/`
+- `logs/`
 - `relevants/`
 - `code/`
 - `experiments/`
