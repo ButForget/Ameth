@@ -7,7 +7,7 @@ Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs
 This repository is still in very early development.
 
 - Project initialization is implemented.
-- The `ideas` command namespace is implemented for idea creation, listing, display, abandon, and restore flows.
+- The `ideas` command namespace is implemented for idea creation, listing, display, pin, abandon, and restore flows.
 - `solutions/` and `logs/` are now created as part of the managed project layout.
 
 ## Why Ameth?
@@ -39,6 +39,7 @@ The `ideas/` directory stores the research problem and raw idea documents.
 - `ideas/Problem.md` is the structured anchor for the research problem.
 - Idea files follow a naming pattern like `idea-0001.md`.
 - Abandoned ideas go under `ideas/abandoned/`.
+- `Ameth.toml` stores project metadata including the pinned idea ID.
 - `Problem.md` uses fixed machine-parseable sections: `Abstract`, `Goal`, `Constraints`, and `Open Questions`.
 - Idea files use fixed machine-parseable sections: `Abstract` and `Content`.
 - Nested headings are allowed inside the fixed sections, but only at level 3 or deeper.
@@ -91,7 +92,7 @@ Ameth currently supports project initialization and idea management with:
 ameth
 ameth init <name> [path]
 ameth <name> [path]
-ameth ideas <command>
+ameth ideas [command]
 ```
 
 Behavior:
@@ -102,11 +103,15 @@ Behavior:
 - `[path]` is the parent directory and defaults to `.`.
 - `ameth <name> [path]` is an alias for `ameth init <name> [path]`.
 - The command fails if `[path]/<name>` already exists.
+- `ameth init` creates `Ameth.toml` for project metadata.
 - `ameth ideas new` creates the next `idea-000N.md` file.
 - `ameth ideas list` lists active ideas and their abstract text.
 - `ameth ideas show <id>` shows an active or abandoned idea.
+- `ameth ideas show` shows the pinned idea.
+- `ameth ideas pin <id>` records the pinned idea in `Ameth.toml`.
 - `ameth ideas abandon <id>` moves an idea into `ideas/abandoned/`.
 - `ameth ideas restore <id>` moves an idea back into `ideas/`.
+- Bare `ameth ideas` shows the pinned idea when one is set, and otherwise prints ideas help.
 
 It creates this layout:
 
@@ -117,4 +122,5 @@ It creates this layout:
 - `relevants/`
 - `code/`
 - `experiments/`
+- `Ameth.toml`
 - `ideas/Problem.md`

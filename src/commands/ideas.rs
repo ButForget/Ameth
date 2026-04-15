@@ -4,30 +4,39 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use toml_edit::{DocumentMut, Item, Table, value};
 
-pub const USAGE: &str = "ameth ideas <command>";
-pub const HELP: &str = "Manage idea files.\n\nUsage:\n  ameth ideas new\n  ameth ideas list\n  ameth ideas show <id>\n  ameth ideas abandon <id>\n  ameth ideas restore <id>\n\nCommands:\n  new       Create the next idea file\n  list      List active ideas\n  show      Display an idea by ID\n  abandon   Move an active idea into ideas/abandoned/\n  restore   Move an abandoned idea back into ideas/\n";
+pub const USAGE: &str = "ameth ideas\nameth ideas new\nameth ideas list\nameth ideas show [id]\nameth ideas pin <id>\nameth ideas abandon <id>\nameth ideas restore <id>";
+pub const HELP: &str = "Manage idea files.\n\nUsage:\n  ameth ideas\n  ameth ideas new\n  ameth ideas list\n  ameth ideas show [id]\n  ameth ideas pin <id>\n  ameth ideas abandon <id>\n  ameth ideas restore <id>\n\nCommands:\n  new       Create the next idea file\n  list      List active ideas\n  show      Display an idea by ID, or the pinned idea when no ID is given\n  pin       Pin an idea ID for quick access\n  abandon   Move an active idea into ideas/abandoned/\n  restore   Move an abandoned idea back into ideas/\n\nNotes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Bare `ameth ideas` prints this help when no pinned idea is set.\n";
 
 const NEW_USAGE: &str = "ameth ideas new";
 const LIST_USAGE: &str = "ameth ideas list";
-const SHOW_USAGE: &str = "ameth ideas show <id>";
+const SHOW_USAGE: &str = "ameth ideas show [id]";
+const PIN_USAGE: &str = "ameth ideas pin <id>";
 const ABANDON_USAGE: &str = "ameth ideas abandon <id>";
 const RESTORE_USAGE: &str = "ameth ideas restore <id>";
 
 const NEW_HELP: &str = "Create the next idea file.\n\nUsage:\n  ameth ideas new\n";
 const LIST_HELP: &str = "List active ideas.\n\nUsage:\n  ameth ideas list\n";
-const SHOW_HELP: &str = "Display an idea by ID.\n\nUsage:\n  ameth ideas show <id>\n";
+const SHOW_HELP: &str = "Display an idea by ID, or the pinned idea when no ID is given.\n\nUsage:\n  ameth ideas show [id]\n";
+const PIN_HELP: &str = "Pin an idea ID for quick access.\n\nUsage:\n  ameth ideas pin <id>\n";
 const ABANDON_HELP: &str =
     "Move an active idea into ideas/abandoned/.\n\nUsage:\n  ameth ideas abandon <id>\n";
 const RESTORE_HELP: &str =
     "Move an abandoned idea back into ideas/.\n\nUsage:\n  ameth ideas restore <id>\n";
 
 const IDEA_TEMPLATE: &str = "## Abstract\n\n## Content\n";
+const AMETH_TOML_FILE_NAME: &str = "Ameth.toml";
+const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
 pub fn run(args: Vec<OsString>) -> Result<(), String> {
-    if args.is_empty() || (args.len() == 1 && is_help_flag(&args[0])) {
+    if args.len() == 1 && is_help_flag(&args[0]) {
         print!("{HELP}");
         return Ok(());
+    }
+
+    if args.is_empty() {
+        return run_default();
     }
 
     let subcommand = args[0]
@@ -38,10 +47,25 @@ pub fn run(args: Vec<OsString>) -> Result<(), String> {
         "new" => run_new(&args[1..]),
         "list" => run_list(&args[1..]),
         "show" => run_show(&args[1..]),
+        "pin" => run_pin(&args[1..]),
         "abandon" => run_abandon(&args[1..]),
         "restore" => run_restore(&args[1..]),
         _ => Err(format!("invalid arguments\n\nUsage:\n  {USAGE}")),
     }
+}
+
+fn run_default() -> Result<(), String> {
+    let Ok(project) = IdeasProject::load() else {
+        print!("{HELP}");
+        return Ok(());
+    };
+
+    let Some(id) = read_pinned_id(&project)? else {
+        print!("{HELP}");
+        return Ok(());
+    };
+
+    show_idea(&project, id)
 }
 
 fn run_new(args: &[OsString]) -> Result<(), String> {
@@ -104,39 +128,39 @@ fn run_show(args: &[OsString]) -> Result<(), String> {
         return Ok(());
     }
 
-    if args.len() != 1 {
+    if args.len() > 1 {
         return Err(format!("invalid arguments\n\nUsage:\n  {SHOW_USAGE}"));
     }
 
     let project = IdeasProject::load()?;
-    let id = parse_idea_id_argument(&args[0])?;
-    let file_name = idea_file_name(id);
-    let active_path = project.ideas_dir.join(&file_name);
-    let abandoned_path = project.abandoned_dir.join(&file_name);
-
-    let path = match (active_path.is_file(), abandoned_path.is_file()) {
-        (true, true) => {
-            eprintln!(
-                "warning: idea {} exists in both ideas/ and ideas/abandoned/; showing the active idea",
-                format_idea_id(id)
-            );
-            active_path
-        }
-        (true, false) => active_path,
-        (false, true) => abandoned_path,
-        (false, false) => return Err(format!("idea {} not found", format_idea_id(id))),
+    let id = match args.first() {
+        Some(argument) => parse_idea_id_argument(argument)?,
+        None => match read_pinned_id(&project)? {
+            Some(id) => id,
+            None => return Err("no pinned idea set".to_string()),
+        },
     };
 
-    let markdown = fs::read_to_string(&path)
-        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
-    parse_idea_document(&markdown)
-        .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+    show_idea(&project, id)
+}
 
-    print!("{markdown}");
-    if !markdown.ends_with('\n') {
-        println!();
+fn run_pin(args: &[OsString]) -> Result<(), String> {
+    if args.len() == 1 && is_help_flag(&args[0]) {
+        print!("{PIN_HELP}");
+        return Ok(());
     }
 
+    if args.len() != 1 {
+        return Err(format!("invalid arguments\n\nUsage:\n  {PIN_USAGE}"));
+    }
+
+    let project = IdeasProject::load()?;
+    let id = parse_idea_id_argument(&args[0])?;
+
+    read_idea_markdown(&project, id)?;
+    write_pinned_id(&project, id)?;
+
+    println!("Pinned idea {}", format_idea_id(id));
     Ok(())
 }
 
@@ -220,6 +244,118 @@ fn move_idea(
     })
 }
 
+fn show_idea(project: &IdeasProject, id: u32) -> Result<(), String> {
+    let markdown = read_idea_markdown(project, id)?;
+
+    print!("{markdown}");
+    if !markdown.ends_with('\n') {
+        println!();
+    }
+
+    Ok(())
+}
+
+fn read_idea_markdown(project: &IdeasProject, id: u32) -> Result<String, String> {
+    let path = resolve_idea_path(project, id)?;
+    let markdown = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    parse_idea_document(&markdown)
+        .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+
+    Ok(markdown)
+}
+
+fn resolve_idea_path(project: &IdeasProject, id: u32) -> Result<PathBuf, String> {
+    let file_name = idea_file_name(id);
+    let active_path = project.ideas_dir.join(&file_name);
+    let abandoned_path = project.abandoned_dir.join(&file_name);
+
+    match (active_path.is_file(), abandoned_path.is_file()) {
+        (true, true) => {
+            eprintln!(
+                "warning: idea {} exists in both ideas/ and ideas/abandoned/; showing the active idea",
+                format_idea_id(id)
+            );
+            Ok(active_path)
+        }
+        (true, false) => Ok(active_path),
+        (false, true) => Ok(abandoned_path),
+        (false, false) => Err(format!("idea {} not found", format_idea_id(id))),
+    }
+}
+
+fn read_pinned_id(project: &IdeasProject) -> Result<Option<u32>, String> {
+    let document = read_ameth_toml(&project.config_path)?;
+    let Some(ideas) = document.get("ideas") else {
+        return Ok(None);
+    };
+    let Some(ideas) = ideas.as_table_like() else {
+        return Err(format!(
+            "invalid [ideas] table in {}",
+            project.config_path.display()
+        ));
+    };
+    let Some(pinned) = ideas.get("pinned") else {
+        return Ok(None);
+    };
+    let Some(pinned) = pinned.as_integer() else {
+        return Err(format!(
+            "invalid ideas.pinned value in {}",
+            project.config_path.display()
+        ));
+    };
+
+    if pinned <= 0 || pinned > i64::from(u32::MAX) {
+        return Err(format!(
+            "invalid ideas.pinned value in {}",
+            project.config_path.display()
+        ));
+    }
+
+    Ok(Some(pinned as u32))
+}
+
+fn write_pinned_id(project: &IdeasProject, id: u32) -> Result<(), String> {
+    let mut document = read_ameth_toml(&project.config_path)?;
+
+    match document.get("ideas") {
+        Some(item) if item.as_table_like().is_some() => {}
+        Some(_) => {
+            return Err(format!(
+                "invalid [ideas] table in {}",
+                project.config_path.display()
+            ));
+        }
+        None => {
+            document["ideas"] = Item::Table(Table::new());
+        }
+    }
+
+    document["ideas"]["pinned"] = value(i64::from(id));
+
+    fs::write(&project.config_path, document.to_string())
+        .map_err(|error| format!("failed to write {}: {error}", project.config_path.display()))
+}
+
+fn read_ameth_toml(path: &Path) -> Result<DocumentMut, String> {
+    if !path.exists() {
+        return AMETH_TOML_TEMPLATE
+            .parse::<DocumentMut>()
+            .map_err(|error| format!("failed to prepare {}: {error}", path.display()));
+    }
+
+    if !path.is_file() {
+        return Err(format!("invalid Ameth config path: {}", path.display()));
+    }
+
+    let content = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+
+    content
+        .parse::<DocumentMut>()
+        .map_err(|error| format!("failed to parse {}: {error}", path.display()))
+}
+
 fn is_help_flag(argument: &OsString) -> bool {
     argument == "--help" || argument == "-h"
 }
@@ -301,6 +437,7 @@ fn single_line(text: &str) -> String {
 }
 
 struct IdeasProject {
+    config_path: PathBuf,
     ideas_dir: PathBuf,
     abandoned_dir: PathBuf,
 }
@@ -309,6 +446,7 @@ impl IdeasProject {
     fn load() -> Result<Self, String> {
         let root = env::current_dir()
             .map_err(|error| format!("failed to read current directory: {error}"))?;
+        let config_path = root.join(AMETH_TOML_FILE_NAME);
         let ideas_dir = root.join("ideas");
         let abandoned_dir = ideas_dir.join("abandoned");
         let problem_file = ideas_dir.join("Problem.md");
@@ -318,6 +456,7 @@ impl IdeasProject {
         }
 
         Ok(Self {
+            config_path,
             ideas_dir,
             abandoned_dir,
         })
