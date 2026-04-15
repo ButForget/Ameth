@@ -6,9 +6,8 @@ Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs
 
 This repository is still in very early development.
 
-- The current codebase is a minimal Rust binary stub.
-- The CLI described below is the intended direction, not fully implemented behavior.
-- Today, `cargo run` only runs a placeholder program from `src/main.rs`.
+- The initial project initialization command is implemented.
+- The idea-management flow beyond project bootstrapping is still in development.
 
 ## Why Ameth?
 
@@ -43,7 +42,9 @@ The `ideas/` directory is intended to capture the research problem and candidate
 This repo currently contains:
 
 - `Cargo.toml` for the single Rust package
-- `src/main.rs` as the only entrypoint
+- `src/main.rs` as the thin entrypoint
+- `src/cli/` for root CLI dispatch and whole-program help
+- `src/commands/` for per-command parsing, help text, and execution
 - `PROJECT_STATE.md` for a brief project status note
 
 ## Development
@@ -55,18 +56,35 @@ This repo currently contains:
 ### Useful Commands
 
 ```bash
-cargo run
+cargo run -- demo
 cargo test
 cargo fmt --check
 ```
 
-## Planned CLI
+## Current CLI
 
-The README originally described a command like:
+Ameth currently supports project initialization with:
 
 ```bash
-ameth <path>
+ameth
+ameth init <name> [path]
+ameth <name> [path]
 ```
 
-That interface is not implemented yet. If it gets added, it should be treated as new functionality rather than existing behavior.
+Behavior:
 
+- `ameth` prints the whole-program introduction and root help.
+- `ameth init <name> [path]` initializes a project.
+- `<name>` becomes the new project directory name.
+- `[path]` is the parent directory and defaults to `.`.
+- `ameth <name> [path]` is an alias for `ameth init <name> [path]`.
+- The command fails if `[path]/<name>` already exists.
+
+It creates this initial layout:
+
+- `ideas/`
+- `ideas/abandoned/`
+- `relevants/`
+- `code/`
+- `experiments/`
+- `ideas/Problem.md`
