@@ -1,17 +1,48 @@
-# Ideas Management Spec
+# Ideas and Research Question Spec
 
 ## Scope
 
-This document defines the current idea-management structure and the root research-question file for Ameth.
+This document describes the current Ameth behavior for idea management and the root research-question file.
 
 The command namespaces are `ameth ideas` and `ameth rq`.
 
+These commands operate on the current working directory and expect to run from an initialized Ameth project root.
+
+## Root Layout
+
+An initialized Ameth project contains this managed root shape:
+
+```text
+<project>/
+  Ameth.toml
+  ResearchQuestion.md
+  ideas/
+    abandoned/
+  solutions/
+  logs/
+  relevants/
+  code/
+  experiments/
+```
+
+Current intent:
+
+- `ResearchQuestion.md` stores free-form background for the project.
+- `ideas/` stores raw idea documents.
+- `solutions/` is reserved for more structured solution documents promoted from promising ideas.
+- `logs/` exists as a placeholder for now.
+
+## `Ameth.toml`
+
 Idea pin metadata and the default editor command live in the project root `Ameth.toml` file.
 
-Editor config is root-level because it can be reused by multiple workflows:
+Ameth currently uses:
 
 ```toml
 editor = "nvim"
+
+[ideas]
+pinned = 4
 ```
 
 Use an array when the editor needs fixed arguments:
@@ -20,40 +51,12 @@ Use an array when the editor needs fixed arguments:
 editor = ["code", "--wait"]
 ```
 
-## Root Structure
+Rules:
 
-An Ameth-managed research project should contain these root directories:
-
-- `ideas/`
-- `solutions/`
-- `logs/`
-- `relevants/`
-- `code/`
-- `experiments/`
-
-Current intent:
-
-- `ResearchQuestion.md` stores free-form background for the project.
-- `ideas/` stores raw idea documents.
-- `solutions/` is for more structured solution documents built from promising ideas.
-- `logs/` exists as a placeholder for now.
-
-At the project root:
-
-- `ResearchQuestion.md`
-- `ideas/`
-
-Within `ideas/`:
-
-- `ideas/abandoned/`
-- `ideas/idea-0001.md`
-- `ideas/idea-0002.md`
-
-## Parser
-
-Ameth should parse idea files with `pulldown-cmark`.
-
-Idea parsing is strict about required heading names and heading levels so active and abandoned idea files can be consumed reliably by Ameth subcommands.
+- `editor` must be either a string or an array of strings.
+- The first editor entry is the program name.
+- Interactive `ameth ideas new` and `ameth rq edit` require `editor` to be configured.
+- `[ideas].pinned` stores the pinned idea ID as a positive integer.
 
 ## Research Question File
 
@@ -63,10 +66,11 @@ Rules:
 
 - The file is intentionally free-form.
 - Ameth does not require any fixed headings or section names.
+- `ameth init` creates it with the template `# Research Question`.
 - `ameth rq show` prints the file as-is.
 - `ameth rq edit` opens the existing file in the configured root-level editor.
-- `ameth rq edit -n` creates a new file only when it is missing.
-- `ameth rq edit -f -n` recreates the file even when it already exists.
+- `ameth rq edit -n` creates a new file only when it is missing, then opens it.
+- `ameth rq edit -f -n` recreates the file even when it already exists, then opens it.
 - `ameth rq show` and plain `ameth rq edit` fail if the file is missing.
 
 ## Idea Files
@@ -82,7 +86,7 @@ Filename format:
 Rules:
 
 - The numeric part is the canonical idea ID.
-- IDs should be zero-padded to 4 digits.
+- IDs are stored in filenames as zero-padded four-digit numbers.
 - Active ideas live in `ideas/`.
 - Abandoned ideas live in `ideas/abandoned/`.
 
@@ -102,8 +106,9 @@ Main idea text.
 More detail.
 ```
 
-Rules:
+Parser rules:
 
+- Level-1 headings are not allowed.
 - The only allowed level-2 headings are `Abstract` and `Content`.
 - `Abstract` must come first.
 - `Content` must come second.
@@ -111,26 +116,32 @@ Rules:
 - Plain paragraphs are allowed under both sections.
 - Nested headings are allowed only under `Content`, and they must be level 3 or deeper.
 - Unknown extra level-2 headings are invalid.
-- Content should belong to either `Abstract` or `Content`.
+- Content must belong to either `Abstract` or `Content`.
 
-## Planned Command Behavior
+## Current Command Behavior
 
-Current `ameth ideas` behavior should align with these files:
+### `ameth ideas`
 
 - `ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]` creates the next `ideas/idea-000N.md` file using the required idea template.
 - When either field is omitted, `ameth ideas new` opens the root-level `editor` from `Ameth.toml` after creating the template and waits for it to exit.
-- `ameth ideas list` parses active idea files and displays their IDs plus `Abstract` text.
-- `ameth ideas show <id>` parses and displays the selected idea.
+- `ameth ideas list` parses active idea files and displays their IDs plus single-line `Abstract` text.
+- `ameth ideas show <id>` parses and displays the selected active or abandoned idea.
 - `ameth ideas show` parses and displays the pinned idea.
 - `ameth ideas pin <id>` records the pinned idea ID in `Ameth.toml`.
-- `ameth ideas abandon <id>` moves an idea file into `ideas/abandoned/`.
-- `ameth ideas restore <id>` moves an idea file back into `ideas/`.
-- Bare `ameth ideas` is an alias for `ameth ideas show` when an idea is pinned; otherwise it shows ideas help.
+- `ameth ideas abandon <id>` moves an active idea file into `ideas/abandoned/`.
+- `ameth ideas restore <id>` moves an abandoned idea file back into `ideas/`.
+- Bare `ameth ideas` shows the pinned idea when one is set. Otherwise it shows ideas help.
+
+### `ameth rq`
+
+- Bare `ameth rq` shows help.
 - `ameth rq show` prints `ResearchQuestion.md`.
 - `ameth rq edit` opens `ResearchQuestion.md` in the configured editor.
+- `ameth rq edit -n` creates the file when it is missing, then opens it.
+- `ameth rq edit -f -n` recreates the file, then opens it.
 
 ## Notes
 
-- `ResearchQuestion.md` is a free-form background file at the project root.
-- Idea files stay intentionally simple.
-- `solutions/` and `logs/` are part of the project structure even though their workflows are not defined yet.
+- `ResearchQuestion.md` is intentionally free-form.
+- Idea files stay intentionally simple but are parsed strictly.
+- `solutions/` and `logs/` are part of the initialized project structure even though their workflows are not defined yet.
