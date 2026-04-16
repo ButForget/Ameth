@@ -4,8 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
-const PROBLEM_TEMPLATE: &str =
-    "# Problem\n\n## Abstract\n\n## Goal\n\n## Constraints\n\n## Open Questions\n";
+const RESEARCH_QUESTION_TEMPLATE: &str = "# Research Question\n\n";
 const IDEA_TEMPLATE: &str = "## Abstract\n\n## Content\n";
 const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
@@ -25,9 +24,113 @@ fn init_creates_the_full_ideas_project_layout() {
         AMETH_TOML_TEMPLATE
     );
     assert_eq!(
-        fs::read_to_string(project_root.join("ideas/Problem.md"))
-            .expect("problem file should exist"),
-        PROBLEM_TEMPLATE
+        fs::read_to_string(project_root.join("ResearchQuestion.md"))
+            .expect("research question file should exist"),
+        RESEARCH_QUESTION_TEMPLATE
+    );
+}
+
+#[test]
+fn rq_show_reads_the_root_research_question_file() {
+    let (_workspace, project_root) = init_project("demo");
+
+    fs::write(
+        project_root.join("ResearchQuestion.md"),
+        "Project background\n\nCurrent question\n",
+    )
+    .expect("research question file should be updated");
+
+    command_in(&project_root)
+        .args(["rq", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Project background"))
+        .stdout(predicate::str::contains("Current question"))
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn rq_show_fails_when_the_research_question_file_is_missing() {
+    let (_workspace, project_root) = init_project("demo");
+    fs::remove_file(project_root.join("ResearchQuestion.md"))
+        .expect("research question file should be removed");
+
+    command_in(&project_root)
+        .args(["rq", "show"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "error: ResearchQuestion.md not found",
+        ));
+}
+
+#[test]
+fn rq_edit_requires_an_existing_file_without_new() {
+    let (_workspace, project_root) = init_project("demo");
+    configure_editor(&project_root, "true");
+    fs::remove_file(project_root.join("ResearchQuestion.md"))
+        .expect("research question file should be removed");
+
+    command_in(&project_root)
+        .args(["rq", "edit"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "error: ResearchQuestion.md not found",
+        ));
+}
+
+#[test]
+fn rq_edit_new_creates_the_file_when_missing() {
+    let (_workspace, project_root) = init_project("demo");
+    configure_editor(&project_root, "true");
+    fs::remove_file(project_root.join("ResearchQuestion.md"))
+        .expect("research question file should be removed");
+
+    command_in(&project_root)
+        .args(["rq", "edit", "-n"])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    assert_eq!(
+        fs::read_to_string(project_root.join("ResearchQuestion.md"))
+            .expect("research question file should exist"),
+        RESEARCH_QUESTION_TEMPLATE
+    );
+}
+
+#[test]
+fn rq_edit_new_fails_when_the_file_already_exists() {
+    let (_workspace, project_root) = init_project("demo");
+    configure_editor(&project_root, "true");
+
+    command_in(&project_root)
+        .args(["rq", "edit", "-n"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "error: ResearchQuestion.md already exists",
+        ));
+}
+
+#[test]
+fn rq_edit_force_new_overwrites_the_existing_file() {
+    let (_workspace, project_root) = init_project("demo");
+    configure_editor(&project_root, "true");
+    fs::write(project_root.join("ResearchQuestion.md"), "old content\n")
+        .expect("research question file should be updated");
+
+    command_in(&project_root)
+        .args(["rq", "edit", "-f", "-n"])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    assert_eq!(
+        fs::read_to_string(project_root.join("ResearchQuestion.md"))
+            .expect("research question file should exist"),
+        RESEARCH_QUESTION_TEMPLATE
     );
 }
 

@@ -2,9 +2,9 @@
 
 ## Scope
 
-This document defines the planned idea-management structure and file formats for Ameth.
+This document defines the current idea-management structure and the root research-question file for Ameth.
 
-The command namespace is `ameth ideas`.
+The command namespaces are `ameth ideas` and `ameth rq`.
 
 Idea pin metadata and the default editor command live in the project root `Ameth.toml` file.
 
@@ -33,50 +33,41 @@ An Ameth-managed research project should contain these root directories:
 
 Current intent:
 
-- `ideas/` stores the research problem and raw idea documents.
+- `ResearchQuestion.md` stores free-form background for the project.
+- `ideas/` stores raw idea documents.
 - `solutions/` is for more structured solution documents built from promising ideas.
 - `logs/` exists as a placeholder for now.
 
+At the project root:
+
+- `ResearchQuestion.md`
+- `ideas/`
+
 Within `ideas/`:
 
-- `ideas/Problem.md`
 - `ideas/abandoned/`
 - `ideas/idea-0001.md`
 - `ideas/idea-0002.md`
 
 ## Parser
 
-Ameth should parse `ideas/Problem.md` and idea files with `pulldown-cmark`.
+Ameth should parse idea files with `pulldown-cmark`.
 
-The parser should be strict about required heading names and heading levels so these files can be consumed reliably by Ameth subcommands.
+Idea parsing is strict about required heading names and heading levels so active and abandoned idea files can be consumed reliably by Ameth subcommands.
 
-## Problem File
+## Research Question File
 
-The problem file stays at `ideas/Problem.md`.
-
-Required template:
-
-```md
-# Problem
-
-## Abstract
-
-## Goal
-
-## Constraints
-
-## Open Questions
-```
+The background file lives at the project root as `ResearchQuestion.md`.
 
 Rules:
 
-- The file must begin with `# Problem`.
-- The level-2 headings are fixed: `Abstract`, `Goal`, `Constraints`, `Open Questions`.
-- These level-2 headings are the machine-parseable section boundaries.
-- Free text is allowed inside each section.
-- Nested headings are allowed inside each section, but they must be level 3 or deeper.
-- Unknown level-2 headings are invalid.
-- Content should belong to one of the fixed sections.
+- The file is intentionally free-form.
+- Ameth does not require any fixed headings or section names.
+- `ameth rq show` prints the file as-is.
+- `ameth rq edit` opens the existing file in the configured root-level editor.
+- `ameth rq edit -n` creates a new file only when it is missing.
+- `ameth rq edit -f -n` recreates the file even when it already exists.
+- `ameth rq show` and plain `ameth rq edit` fail if the file is missing.
 
 ## Idea Files
 
@@ -124,7 +115,7 @@ Rules:
 
 ## Planned Command Behavior
 
-Initial `ameth ideas` behavior should align with these files:
+Current `ameth ideas` behavior should align with these files:
 
 - `ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]` creates the next `ideas/idea-000N.md` file using the required idea template.
 - When either field is omitted, `ameth ideas new` opens the root-level `editor` from `Ameth.toml` after creating the template and waits for it to exit.
@@ -135,9 +126,11 @@ Initial `ameth ideas` behavior should align with these files:
 - `ameth ideas abandon <id>` moves an idea file into `ideas/abandoned/`.
 - `ameth ideas restore <id>` moves an idea file back into `ideas/`.
 - Bare `ameth ideas` is an alias for `ameth ideas show` when an idea is pinned; otherwise it shows ideas help.
+- `ameth rq show` prints `ResearchQuestion.md`.
+- `ameth rq edit` opens `ResearchQuestion.md` in the configured editor.
 
 ## Notes
 
-- `Problem.md` is the structured anchor for the research problem.
+- `ResearchQuestion.md` is a free-form background file at the project root.
 - Idea files stay intentionally simple.
 - `solutions/` and `logs/` are part of the project structure even though their workflows are not defined yet.

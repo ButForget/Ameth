@@ -7,7 +7,7 @@ Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs
 This repository is still in very early development.
 
 - Project initialization is implemented.
-- The `ideas` command namespace is implemented for idea creation, listing, display, pin, abandon, and restore flows.
+- The `ideas` and `rq` command namespaces are implemented.
 - `solutions/` and `logs/` are now created as part of the managed project layout.
 
 ## Why Ameth?
@@ -25,6 +25,7 @@ Ameth is meant to provide a predictable project structure for research work, so 
 
 The planned research layout is centered around these top-level directories:
 
+- `ResearchQuestion.md`
 - `ideas/`
 - `solutions/`
 - `logs/`
@@ -34,15 +35,22 @@ The planned research layout is centered around these top-level directories:
 
 ### `ideas/`
 
-The `ideas/` directory stores the research problem and raw idea documents.
+The `ideas/` directory stores raw idea documents.
 
-- `ideas/Problem.md` is the structured anchor for the research problem.
 - Idea files follow a naming pattern like `idea-0001.md`.
 - Abandoned ideas go under `ideas/abandoned/`.
 - `Ameth.toml` stores project metadata including the root editor command and pinned idea ID.
-- `Problem.md` uses fixed machine-parseable sections: `Abstract`, `Goal`, `Constraints`, and `Open Questions`.
 - Idea files use fixed machine-parseable sections: `Abstract` and `Content`.
 - Nested headings are allowed inside the fixed sections, but only at level 3 or deeper.
+
+### `ResearchQuestion.md`
+
+`ResearchQuestion.md` lives at the project root.
+
+- It is a free-form background file for humans and LLMs.
+- Ameth does not enforce any heading structure or markdown schema for it.
+- `ameth rq show` prints it as-is.
+- `ameth rq edit` opens it with the root-level `editor` from `Ameth.toml`.
 
 ### `solutions/`
 
@@ -86,12 +94,13 @@ cargo fmt --check
 
 ## Current CLI
 
-Ameth currently supports project initialization and idea management with:
+Ameth currently supports project initialization, idea management, and root research-question management with:
 
 ```bash
 ameth
 ameth init <name> [path]
 ameth ideas [command]
+ameth rq [command]
 ```
 
 Behavior:
@@ -112,6 +121,11 @@ Behavior:
 - `ameth ideas abandon <id>` moves an idea into `ideas/abandoned/`.
 - `ameth ideas restore <id>` moves an idea back into `ideas/`.
 - Bare `ameth ideas` shows the pinned idea when one is set, and otherwise prints ideas help.
+- `ameth rq show` prints the root `ResearchQuestion.md` file.
+- `ameth rq edit` opens the existing root `ResearchQuestion.md` file.
+- `ameth rq edit -n` creates `ResearchQuestion.md` when it is missing, then opens it.
+- `ameth rq edit -f -n` recreates `ResearchQuestion.md` even when it already exists, then opens it.
+- `ameth rq show` and `ameth rq edit` fail when `ResearchQuestion.md` is missing.
 
 It creates this layout:
 
@@ -123,4 +137,4 @@ It creates this layout:
 - `code/`
 - `experiments/`
 - `Ameth.toml`
-- `ideas/Problem.md`
+- `ResearchQuestion.md`

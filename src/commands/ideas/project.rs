@@ -18,9 +18,8 @@ impl IdeasProject {
         let config_path = root.join(AMETH_TOML_FILE_NAME);
         let ideas_dir = root.join("ideas");
         let abandoned_dir = ideas_dir.join("abandoned");
-        let problem_file = ideas_dir.join("Problem.md");
 
-        if !ideas_dir.is_dir() || !abandoned_dir.is_dir() || !problem_file.is_file() {
+        if !config_path.is_file() || !ideas_dir.is_dir() || !abandoned_dir.is_dir() {
             return Err("current directory is not an Ameth project".to_string());
         }
 
