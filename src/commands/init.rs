@@ -1,10 +1,10 @@
+use crate::config::{AMETH_TOML_FILE_NAME, AmethConfig};
 use clap::Args;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const PROBLEM_TEMPLATE: &str =
     "# Problem\n\n## Abstract\n\n## Goal\n\n## Constraints\n\n## Open Questions\n";
-const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
 #[derive(Args, Debug)]
 #[command(about = "Initialize an Ameth project")]
@@ -82,8 +82,7 @@ fn execute(command: &InitCommand) -> Result<(), String> {
         .map_err(|error| format_create_error(&project_root.join("experiments"), error))?;
     fs::write(project_root.join("ideas/Problem.md"), PROBLEM_TEMPLATE)
         .map_err(|error| format_write_error(&project_root.join("ideas/Problem.md"), error))?;
-    fs::write(project_root.join("Ameth.toml"), AMETH_TOML_TEMPLATE)
-        .map_err(|error| format_write_error(&project_root.join("Ameth.toml"), error))?;
+    AmethConfig::default().save(&project_root.join(AMETH_TOML_FILE_NAME))?;
 
     println!("Initialized Ameth project at {}", project_root.display());
     Ok(())

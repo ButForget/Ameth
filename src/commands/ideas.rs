@@ -1,14 +1,12 @@
+use crate::config::{AMETH_TOML_FILE_NAME, AmethConfig};
 use clap::{Args, Command, Subcommand};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use toml_edit::{DocumentMut, Item, Table, value};
 
 const IDEA_TEMPLATE: &str = "## Abstract\n\n## Content\n";
-const AMETH_TOML_FILE_NAME: &str = "Ameth.toml";
-const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
 #[derive(Args, Debug)]
 #[command(
@@ -234,75 +232,14 @@ fn resolve_idea_path(project: &IdeasProject, id: u32) -> Result<PathBuf, String>
 }
 
 fn read_pinned_id(project: &IdeasProject) -> Result<Option<u32>, String> {
-    let document = read_ameth_toml(&project.config_path)?;
-    let Some(ideas) = document.get("ideas") else {
-        return Ok(None);
-    };
-    let Some(ideas) = ideas.as_table_like() else {
-        return Err(format!(
-            "invalid [ideas] table in {}",
-            project.config_path.display()
-        ));
-    };
-    let Some(pinned) = ideas.get("pinned") else {
-        return Ok(None);
-    };
-    let Some(pinned) = pinned.as_integer() else {
-        return Err(format!(
-            "invalid ideas.pinned value in {}",
-            project.config_path.display()
-        ));
-    };
-
-    if pinned <= 0 || pinned > i64::from(u32::MAX) {
-        return Err(format!(
-            "invalid ideas.pinned value in {}",
-            project.config_path.display()
-        ));
-    }
-
-    Ok(Some(pinned as u32))
+    let config = AmethConfig::load_or_default(&project.config_path)?;
+    Ok(config.pinned_id())
 }
 
 fn write_pinned_id(project: &IdeasProject, id: u32) -> Result<(), String> {
-    let mut document = read_ameth_toml(&project.config_path)?;
-
-    match document.get("ideas") {
-        Some(item) if item.as_table_like().is_some() => {}
-        Some(_) => {
-            return Err(format!(
-                "invalid [ideas] table in {}",
-                project.config_path.display()
-            ));
-        }
-        None => {
-            document["ideas"] = Item::Table(Table::new());
-        }
-    }
-
-    document["ideas"]["pinned"] = value(i64::from(id));
-
-    fs::write(&project.config_path, document.to_string())
-        .map_err(|error| format!("failed to write {}: {error}", project.config_path.display()))
-}
-
-fn read_ameth_toml(path: &Path) -> Result<DocumentMut, String> {
-    if !path.exists() {
-        return AMETH_TOML_TEMPLATE
-            .parse::<DocumentMut>()
-            .map_err(|error| format!("failed to prepare {}: {error}", path.display()));
-    }
-
-    if !path.is_file() {
-        return Err(format!("invalid Ameth config path: {}", path.display()));
-    }
-
-    let content = fs::read_to_string(path)
-        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
-
-    content
-        .parse::<DocumentMut>()
-        .map_err(|error| format!("failed to parse {}: {error}", path.display()))
+    let mut config = AmethConfig::load_or_default(&project.config_path)?;
+    config.set_pinned_id(id);
+    config.save(&project.config_path)
 }
 
 fn parse_idea_id(raw: &str) -> Result<u32, String> {
