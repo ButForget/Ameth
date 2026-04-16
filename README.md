@@ -1,14 +1,13 @@
 # Ameth
 
-Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs can understand the problem, relevant materials, code, and experiments with less guesswork.
+Ameth is a Rust CLI for organizing research work so humans and LLMs can recover project context with less guesswork.
 
-## Status
+## Current Status
 
-This repository is still in very early development.
-
-- Project initialization is implemented.
-- The `ideas` command namespace is implemented for idea creation, listing, display, pin, abandon, and restore flows.
-- `solutions/` and `logs/` are now created as part of the managed project layout.
+- `ameth init <name> [path]` is implemented.
+- `ameth ideas` supports `new`, `list`, `show`, `pin`, `abandon`, and `restore`.
+- `ameth rq` supports `show` and `edit`.
+- `solutions/` and `logs/` are created as part of the managed layout, but their workflows are still intentionally undefined.
 
 ## Why Ameth?
 
@@ -19,56 +18,138 @@ Research projects become hard to navigate when ideas, references, code, and expe
 - What references matter?
 - Which experiments belong to which hypothesis?
 
-Ameth is meant to provide a predictable project structure for research work, so context is easier to recover and easier to use.
+Ameth provides a predictable project structure so project context is easier to recover and easier to use.
 
-## Intended Project Structure
+## Current Project Model
 
-The planned research layout is centered around these top-level directories:
+`ameth init demo` creates a project root like this:
 
-- `ideas/`
-- `solutions/`
-- `logs/`
-- `relevants/`
-- `code/`
-- `experiments/`
+```text
+demo/
+  Ameth.toml
+  ResearchQuestion.md
+  ideas/
+    abandoned/
+  solutions/
+  logs/
+  relevants/
+  code/
+  experiments/
+```
 
-### `ideas/`
+The `ideas` and `rq` commands operate on the current working directory, so they should be run from an initialized Ameth project root.
 
-The `ideas/` directory stores the research problem and raw idea documents.
+### Root Files
 
-- `ideas/Problem.md` is the structured anchor for the research problem.
-- Idea files follow a naming pattern like `idea-0001.md`.
-- Abandoned ideas go under `ideas/abandoned/`.
-- `Ameth.toml` stores project metadata including the root editor command and pinned idea ID.
-- `Problem.md` uses fixed machine-parseable sections: `Abstract`, `Goal`, `Constraints`, and `Open Questions`.
-- Idea files use fixed machine-parseable sections: `Abstract` and `Content`.
-- Nested headings are allowed inside the fixed sections, but only at level 3 or deeper.
+`Ameth.toml` stores project metadata. Ameth currently uses:
 
-### `solutions/`
+```toml
+editor = "nvim"
 
-The `solutions/` directory is intended for more structured solution documents promoted from promising ideas.
+[ideas]
+pinned = 4
+```
 
-### `logs/`
+Use an array when the editor needs fixed arguments:
 
-The `logs/` directory is reserved for research logs and currently acts as a placeholder.
+```toml
+editor = ["code", "--wait"]
+```
 
-The planned `ideas` workflow is specified in `ideas.md`.
+- `editor` is required for interactive `ameth ideas new` and `ameth rq edit`.
+- `[ideas].pinned` stores the pinned idea ID for `ameth ideas show` and bare `ameth ideas`.
 
-## TODO
+`ResearchQuestion.md` lives at the project root.
 
-- Define the `solutions/` document workflow in more detail.
-- Keep `logs/` as a placeholder until its workflow is designed.
+- It is a free-form background file for humans and LLMs.
+- Ameth does not enforce any heading structure or markdown schema for it.
+- `ameth init` and `ameth rq edit -n` create it with the initial template `# Research Question`.
 
-## Current Repository Layout
+### Idea Files
 
-This repo currently contains:
+Idea files are lightweight Markdown documents stored under `ideas/`.
 
-- `Cargo.toml` for the single Rust package
-- `src/main.rs` as the thin entrypoint
-- `src/cli/` for root CLI dispatch and whole-program help
-- `src/commands/` for per-command parsing, help text, and execution
-- `PROJECT_STATE.md` for a brief project status note
-- `ideas.md` for the planned ideas-management format and command behavior
+- Active ideas live in `ideas/`.
+- Abandoned ideas live in `ideas/abandoned/`.
+- Filenames use zero-padded four-digit IDs such as `idea-0001.md`.
+
+Required template:
+
+```md
+## Abstract
+
+Short summary of the idea.
+
+## Content
+
+Main idea text.
+
+### Optional Subheading
+
+More detail.
+```
+
+Rules:
+
+- The only allowed level-2 headings are `Abstract` and `Content`.
+- `Abstract` must come first and appear once.
+- `Content` must come second and appear once.
+- Level-1 headings are not allowed.
+- Nested headings are allowed only under `Content`, and they must be level 3 or deeper.
+- Content outside `Abstract` or `Content` is invalid.
+
+## Current CLI
+
+Top-level commands:
+
+```bash
+ameth
+ameth init <name> [path]
+ameth ideas [command]
+ameth rq [command]
+```
+
+Behavior:
+
+- `ameth` prints the whole-program introduction and root help.
+- `ameth init <name> [path]` initializes a new project directory.
+- `<name>` becomes the new project directory name.
+- `[path]` is the parent directory and defaults to `.`.
+- `ameth init` fails if `[path]/<name>` already exists.
+- `ameth init` creates `Ameth.toml`, `ResearchQuestion.md`, and the managed directory layout.
+
+### `ameth ideas`
+
+- `ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]` creates the next `idea-000N.md` file.
+- If either field is omitted, `ameth ideas new` writes the template, opens the root-level `editor` from `Ameth.toml`, and waits for it to exit.
+- `ameth ideas list` lists active ideas and displays each ID plus the `Abstract` text on one line.
+- `ameth ideas show <id>` displays an active or abandoned idea.
+- `ameth ideas show` displays the pinned idea.
+- `ameth ideas pin <id>` records the pinned idea ID in `Ameth.toml`.
+- `ameth ideas abandon <id>` moves an active idea into `ideas/abandoned/`.
+- `ameth ideas restore <id>` moves an abandoned idea back into `ideas/`.
+- Bare `ameth ideas` shows the pinned idea when one is set. Otherwise it prints ideas help.
+
+### `ameth rq`
+
+- Bare `ameth rq` prints research-question help.
+- `ameth rq show` prints `ResearchQuestion.md` as-is.
+- `ameth rq edit` opens the existing `ResearchQuestion.md` file in the configured editor.
+- `ameth rq edit -n` creates `ResearchQuestion.md` when it is missing, then opens it.
+- `ameth rq edit -f -n` recreates `ResearchQuestion.md` even when it already exists, then opens it.
+- `ameth rq show` and plain `ameth rq edit` fail when `ResearchQuestion.md` is missing.
+
+## Relevant Source Layout
+
+- `src/main.rs` is the thin binary entrypoint.
+- `src/cli/` contains root CLI dispatch and whole-program help.
+- `src/commands/init.rs` implements project initialization.
+- `src/commands/ideas.rs` implements idea subcommand parsing and execution.
+- `src/commands/ideas/document.rs` defines the idea template and strict idea parser.
+- `src/commands/ideas/project.rs` handles idea-project file operations and pinned-id persistence.
+- `src/commands/rq.rs` implements research-question display and editor-driven updates.
+- `src/config.rs` loads and saves `Ameth.toml`.
+- `tests/init_cli.rs`, `tests/root_cli.rs`, and `tests/ideas_cli.rs` exercise the CLI end to end.
 
 ## Development
 
@@ -79,48 +160,15 @@ This repo currently contains:
 ### Useful Commands
 
 ```bash
+cargo run --
 cargo run -- init demo
+cargo run -- ideas --help
+cargo run -- rq --help
 cargo test
 cargo fmt --check
 ```
 
-## Current CLI
+## Not Yet Defined
 
-Ameth currently supports project initialization and idea management with:
-
-```bash
-ameth
-ameth init <name> [path]
-ameth ideas [command]
-```
-
-Behavior:
-
-- `ameth` prints the whole-program introduction and root help.
-- `ameth init <name> [path]` initializes a project.
-- `<name>` becomes the new project directory name.
-- `[path]` is the parent directory and defaults to `.`.
-- The command fails if `[path]/<name>` already exists.
-- `ameth init` creates `Ameth.toml` for project metadata.
-- `ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]` creates the next `idea-000N.md` file.
-- If either idea field is omitted, `ameth ideas new` opens the root-level `editor` configured in `Ameth.toml` after writing the template.
-- `editor = "nvim"` configures a simple editor command; `editor = ["code", "--wait"]` configures an editor plus fixed arguments.
-- `ameth ideas list` lists active ideas and their abstract text.
-- `ameth ideas show <id>` shows an active or abandoned idea.
-- `ameth ideas show` shows the pinned idea.
-- `ameth ideas pin <id>` records the pinned idea in `Ameth.toml`.
-- `ameth ideas abandon <id>` moves an idea into `ideas/abandoned/`.
-- `ameth ideas restore <id>` moves an idea back into `ideas/`.
-- Bare `ameth ideas` shows the pinned idea when one is set, and otherwise prints ideas help.
-
-It creates this layout:
-
-- `ideas/`
-- `ideas/abandoned/`
-- `solutions/`
-- `logs/`
-- `relevants/`
-- `code/`
-- `experiments/`
-- `Ameth.toml`
-- `ideas/Problem.md`
+- `solutions/` exists in initialized projects, but its document workflow is not defined yet.
+- `logs/` exists in initialized projects, but its workflow is still a placeholder.

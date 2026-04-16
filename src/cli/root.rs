@@ -1,4 +1,4 @@
-use crate::commands::{ideas, init};
+use crate::commands::{ideas, init, rq};
 use clap::{CommandFactory, Parser, Subcommand};
 use std::ffi::OsString;
 use std::io::{self, Write};
@@ -10,7 +10,7 @@ use crate::cli::Error;
     name = "ameth",
     disable_help_subcommand = true,
     about = "Ameth organizes research work so humans and LLMs can recover project context with less guesswork.",
-    after_help = "Notes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Run `ameth init --help` or `ameth ideas --help` for command-specific help."
+    after_help = "Notes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Run `ameth init --help`, `ameth ideas --help`, or `ameth rq --help` for command-specific help."
 )]
 struct RootCli {
     #[command(subcommand)]
@@ -23,6 +23,8 @@ enum RootCommand {
     Init(init::InitArgs),
     #[command(about = "Manage idea files")]
     Ideas(ideas::IdeasArgs),
+    #[command(about = "Manage the root research question file")]
+    Rq(rq::RqArgs),
 }
 
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Error> {
@@ -32,6 +34,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Error> {
         return match command {
             RootCommand::Init(args) => init::run(args).map_err(Error::Runtime),
             RootCommand::Ideas(args) => ideas::run(args).map_err(Error::Runtime),
+            RootCommand::Rq(args) => rq::run(args).map_err(Error::Runtime),
         };
     }
 

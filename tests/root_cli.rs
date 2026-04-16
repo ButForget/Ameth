@@ -9,6 +9,7 @@ fn root_help_prints_program_introduction() -> Result<(), Box<dyn Error>> {
         .success()
         .stdout(predicate::str::contains("Ameth organizes research work"))
         .stdout(predicate::str::contains("Usage: ameth [COMMAND]"))
+        .stdout(predicate::str::contains("rq"))
         .stdout(predicate::str::contains("ameth <name> [path]").not());
 
     Ok(())
@@ -38,7 +39,7 @@ fn explicit_init_subcommand_creates_project() -> Result<(), Box<dyn Error>> {
         .assert()
         .success();
 
-    assert!(temp_dir.path().join("demo/ideas/Problem.md").is_file());
+    assert!(temp_dir.path().join("demo/ResearchQuestion.md").is_file());
 
     Ok(())
 }

@@ -1,9 +1,11 @@
 # AGENTS.md
 
 ## Current State
-- The repo now implements project bootstrap with `ameth init <name> [path]` and the `ameth ideas` command namespace.
+- The repo now implements project bootstrap with `ameth init <name> [path]`, the `ameth ideas` command namespace, and the top-level `ameth rq` command namespace.
 - `ameth init` now creates the full planned root layout, including `solutions/`, `logs/`, and `Ameth.toml`.
+- `ameth init` also creates root `ResearchQuestion.md` as a free-form background file.
 - Idea management currently supports `new`, `list`, `show`, `pin`, `abandon`, and `restore`; `new` accepts `--abs`/`--ctt` and opens the root-level `editor` from `Ameth.toml` when either field is omitted.
+- `ameth rq` currently supports `show` and `edit`; `edit` accepts `-n/--new` and `-f/--force` for controlled creation and recreation of `ResearchQuestion.md`.
 
 ## Repo Shape
 - Single-package Rust repo. Root `Cargo.toml` defines one crate, `ameth`, on edition `2024`.
@@ -19,6 +21,7 @@
 - `cargo run --`: prints the whole-program help.
 - `cargo run -- init demo`: creates a new `demo/` Ameth project in the current directory.
 - `cargo run -- ideas --help`: prints the ideas command help.
+- `cargo run -- rq --help`: prints the research-question command help.
 - `cargo run -- ideas new --abs "summary" --ctt "details"`: creates the next idea file without opening an editor in an initialized project.
 - `cargo run -- ideas pin 1`: pins an existing idea in an initialized project.
 
@@ -27,6 +30,7 @@
 - Each subcommand should live in its own file and own its own usage/help text, parse logic, and execution logic.
 - Bare `ameth` should print the introduction and root help for the whole program.
 - `ameth ideas` owns idea-file creation, listing, display, pinning, and archive/restore moves under `ideas/`.
+- `ameth rq` owns root `ResearchQuestion.md` display and editor-driven updates.
 - Interactive `ameth ideas new` requires a root-level `editor` setting in `Ameth.toml`; use both `--abs` and `--ctt` for non-interactive creation.
 - Do not read files under `tests/` before a verification failure. Implement from the user request and source first, then inspect test code only after the code or test run fails.
 - Keep `AGENTS.md` aligned with code/config, not with planned product docs.

@@ -16,7 +16,7 @@ fn assert_project_layout(project_root: &Path) {
     assert!(project_root.join("relevants").is_dir());
     assert!(project_root.join("code").is_dir());
     assert!(project_root.join("experiments").is_dir());
-    assert!(project_root.join("ideas/Problem.md").is_file());
+    assert!(project_root.join("ResearchQuestion.md").is_file());
     assert!(project_root.join("Ameth.toml").is_file());
 }
 
@@ -71,7 +71,7 @@ fn init_fails_when_target_already_exists() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn init_writes_problem_template() -> Result<(), Box<dyn Error>> {
+fn init_writes_research_question_template() -> Result<(), Box<dyn Error>> {
     let temp_dir = tempfile::tempdir()?;
 
     Command::cargo_bin("ameth")?
@@ -80,10 +80,10 @@ fn init_writes_problem_template() -> Result<(), Box<dyn Error>> {
         .assert()
         .success();
 
-    let problem_path = temp_dir.path().join("demo/ideas/Problem.md");
-    let problem = fs::read_to_string(problem_path)?;
-    assert!(!problem.trim().is_empty());
-    assert!(problem.contains("# Problem"));
+    let research_question_path = temp_dir.path().join("demo/ResearchQuestion.md");
+    let research_question = fs::read_to_string(research_question_path)?;
+    assert!(!research_question.trim().is_empty());
+    assert!(research_question.contains("# Research Question"));
 
     Ok(())
 }
