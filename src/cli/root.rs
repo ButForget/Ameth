@@ -1,50 +1,46 @@
-use crate::commands::{
-    ideas,
-    init::{self, Invocation},
-};
+use crate::commands::{ideas, init};
+use clap::{CommandFactory, Parser, Subcommand};
 use std::ffi::OsString;
+use std::io::{self, Write};
 
-pub const USAGE: &str =
-    "ameth\nameth init <name> [path]\nameth <name> [path]\nameth ideas [command]";
-pub const HELP: &str = "Ameth organizes research work so humans and LLMs can recover project context with less guesswork.\n\nUsage:\n  ameth\n  ameth init <name> [path]\n  ameth <name> [path]\n  ameth ideas [command]\n\nCommands:\n  init   Initialize an Ameth project\n  ideas  Manage idea files\n\nNotes:\n  `ameth <name> [path]` is an alias for `ameth init <name> [path]`.\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Run `ameth init --help` or `ameth ideas --help` for command-specific help.\n";
+use crate::cli::Error;
 
-pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), String> {
-    let mut args = args.into_iter();
-    let _program_name = args.next();
-    let arguments: Vec<OsString> = args.collect();
-
-    dispatch(arguments)
+#[derive(Debug, Parser)]
+#[command(
+    name = "ameth",
+    disable_help_subcommand = true,
+    about = "Ameth organizes research work so humans and LLMs can recover project context with less guesswork.",
+    after_help = "Notes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Run `ameth init --help` or `ameth ideas --help` for command-specific help."
+)]
+struct RootCli {
+    #[command(subcommand)]
+    command: Option<RootCommand>,
 }
 
-fn dispatch(arguments: Vec<OsString>) -> Result<(), String> {
-    if arguments.is_empty() {
-        print!("{HELP}");
-        return Ok(());
-    }
-
-    if is_help_flag(&arguments[0]) {
-        if arguments.len() == 1 {
-            print!("{HELP}");
-            return Ok(());
-        }
-
-        return Err(format!("invalid arguments\n\nUsage:\n  {USAGE}"));
-    }
-
-    if arguments.first().and_then(|argument| argument.to_str()) == Some("init") {
-        return init::run(
-            arguments.into_iter().skip(1).collect(),
-            Invocation::Explicit,
-        );
-    }
-
-    if arguments.first().and_then(|argument| argument.to_str()) == Some("ideas") {
-        return ideas::run(arguments.into_iter().skip(1).collect());
-    }
-
-    init::run(arguments, Invocation::Alias)
+#[derive(Debug, Subcommand)]
+enum RootCommand {
+    #[command(about = "Initialize an Ameth project")]
+    Init(init::InitArgs),
+    #[command(about = "Manage idea files")]
+    Ideas(ideas::IdeasArgs),
 }
 
-fn is_help_flag(argument: &OsString) -> bool {
-    argument == "--help" || argument == "-h"
+pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Error> {
+    let cli = RootCli::try_parse_from(args).map_err(Error::Clap)?;
+
+    if let Some(command) = cli.command {
+        return match command {
+            RootCommand::Init(args) => init::run(args).map_err(Error::Runtime),
+            RootCommand::Ideas(args) => ideas::run(args).map_err(Error::Runtime),
+        };
+    }
+
+    print_root_help().map_err(|error| Error::Runtime(format!("failed to write help: {error}")))
+}
+
+fn print_root_help() -> io::Result<()> {
+    let mut command = RootCli::command();
+    let mut stdout = io::stdout();
+    command.write_long_help(&mut stdout)?;
+    writeln!(stdout)
 }

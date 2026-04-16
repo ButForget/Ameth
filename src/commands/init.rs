@@ -1,18 +1,19 @@
-use std::ffi::OsString;
+use crate::config::{AMETH_TOML_FILE_NAME, AmethConfig};
+use clap::Args;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const USAGE: &str = "ameth init <name> [path]";
-pub const ALIAS_USAGE: &str = "ameth <name> [path]";
-pub const HELP: &str = "Initialize an Ameth project.\n\nUsage:\n  ameth init <name> [path]\n  ameth <name> [path]\n\nArguments:\n  <name>  Project directory name\n  [path]  Parent directory for the project (defaults to `.`)\n";
-
 const PROBLEM_TEMPLATE: &str =
     "# Problem\n\n## Abstract\n\n## Goal\n\n## Constraints\n\n## Open Questions\n";
-const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
-pub enum Invocation {
-    Explicit,
-    Alias,
+#[derive(Args, Debug)]
+#[command(about = "Initialize an Ameth project")]
+pub struct InitArgs {
+    #[arg(value_name = "NAME", value_parser = parse_project_name)]
+    pub name: String,
+
+    #[arg(value_name = "PATH")]
+    pub path: Option<PathBuf>,
 }
 
 pub struct InitCommand {
@@ -20,65 +21,16 @@ pub struct InitCommand {
     parent: PathBuf,
 }
 
-enum ParsedInitCommand {
-    Help,
-    Run(InitCommand),
+pub fn run(args: InitArgs) -> Result<(), String> {
+    let command = InitCommand {
+        name: args.name,
+        parent: args.path.unwrap_or_else(|| PathBuf::from(".")),
+    };
+
+    execute(&command)
 }
 
-pub fn run(args: Vec<OsString>, invocation: Invocation) -> Result<(), String> {
-    match parse(args, invocation)? {
-        ParsedInitCommand::Help => {
-            print!("{HELP}");
-            Ok(())
-        }
-        ParsedInitCommand::Run(command) => execute(&command),
-    }
-}
-
-fn parse(args: Vec<OsString>, invocation: Invocation) -> Result<ParsedInitCommand, String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        return Ok(ParsedInitCommand::Help);
-    }
-
-    if args.is_empty() {
-        return Err(format!(
-            "missing required arguments\n\nUsage: {}",
-            usage_for(&invocation)
-        ));
-    }
-
-    if args.len() > 2 {
-        return Err(format!(
-            "invalid arguments\n\nUsage: {}",
-            usage_for(&invocation)
-        ));
-    }
-
-    let name = validate_project_name(&args[0])?.to_owned();
-    let parent = args
-        .get(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-
-    Ok(ParsedInitCommand::Run(InitCommand { name, parent }))
-}
-
-fn is_help_flag(argument: &OsString) -> bool {
-    argument == "--help" || argument == "-h"
-}
-
-fn usage_for(invocation: &Invocation) -> &'static str {
-    match invocation {
-        Invocation::Explicit => USAGE,
-        Invocation::Alias => ALIAS_USAGE,
-    }
-}
-
-fn validate_project_name(name: &OsString) -> Result<&str, String> {
-    let name = name
-        .to_str()
-        .ok_or_else(|| "project name must be valid UTF-8".to_string())?;
-
+pub fn parse_project_name(name: &str) -> Result<String, String> {
     if name.is_empty() {
         return Err("project name cannot be empty".to_string());
     }
@@ -91,7 +43,7 @@ fn validate_project_name(name: &OsString) -> Result<&str, String> {
         return Err("project name cannot contain a path separator".to_string());
     }
 
-    Ok(name)
+    Ok(name.to_owned())
 }
 
 fn execute(command: &InitCommand) -> Result<(), String> {
@@ -130,8 +82,7 @@ fn execute(command: &InitCommand) -> Result<(), String> {
         .map_err(|error| format_create_error(&project_root.join("experiments"), error))?;
     fs::write(project_root.join("ideas/Problem.md"), PROBLEM_TEMPLATE)
         .map_err(|error| format_write_error(&project_root.join("ideas/Problem.md"), error))?;
-    fs::write(project_root.join("Ameth.toml"), AMETH_TOML_TEMPLATE)
-        .map_err(|error| format_write_error(&project_root.join("Ameth.toml"), error))?;
+    AmethConfig::default().save(&project_root.join(AMETH_TOML_FILE_NAME))?;
 
     println!("Initialized Ameth project at {}", project_root.display());
     Ok(())

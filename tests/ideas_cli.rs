@@ -236,8 +236,8 @@ fn bare_ideas_shows_help_when_no_pin_exists() {
         .args(["ideas"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Manage idea files."))
-        .stdout(predicate::str::contains("ameth ideas pin <id>"))
+        .stdout(predicate::str::contains("Manage idea files"))
+        .stdout(predicate::str::contains("Usage: ameth ideas [COMMAND]"))
         .stderr(predicate::str::is_empty());
 }
 
@@ -345,7 +345,7 @@ fn ideas_pin_fails_for_invalid_ids() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "error: idea id must be a positive integer",
+            "idea id must be a positive integer",
         ));
 }
 
@@ -442,7 +442,7 @@ fn ideas_show_rejects_invalid_ids() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "error: idea id must be a positive integer",
+            "idea id must be a positive integer",
         ));
 }
 
