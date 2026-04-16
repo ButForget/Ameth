@@ -34,8 +34,8 @@ fn init_help_is_command_specific() -> Result<(), Box<dyn Error>> {
         .args(["init", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Initialize an Ameth project."))
-        .stdout(predicate::str::contains("ameth init <name> [path]"));
+        .stdout(predicate::str::contains("Initialize an Ameth project"))
+        .stdout(predicate::str::contains("Usage: ameth init <NAME> [PATH]"));
 
     Ok(())
 }

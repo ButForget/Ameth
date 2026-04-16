@@ -1,83 +1,80 @@
+use clap::{Args, Command, Subcommand};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use toml_edit::{DocumentMut, Item, Table, value};
-
-pub const USAGE: &str = "ameth ideas\nameth ideas new\nameth ideas list\nameth ideas show [id]\nameth ideas pin <id>\nameth ideas abandon <id>\nameth ideas restore <id>";
-pub const HELP: &str = "Manage idea files.\n\nUsage:\n  ameth ideas\n  ameth ideas new\n  ameth ideas list\n  ameth ideas show [id]\n  ameth ideas pin <id>\n  ameth ideas abandon <id>\n  ameth ideas restore <id>\n\nCommands:\n  new       Create the next idea file\n  list      List active ideas\n  show      Display an idea by ID, or the pinned idea when no ID is given\n  pin       Pin an idea ID for quick access\n  abandon   Move an active idea into ideas/abandoned/\n  restore   Move an abandoned idea back into ideas/\n\nNotes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Bare `ameth ideas` prints this help when no pinned idea is set.\n";
-
-const NEW_USAGE: &str = "ameth ideas new";
-const LIST_USAGE: &str = "ameth ideas list";
-const SHOW_USAGE: &str = "ameth ideas show [id]";
-const PIN_USAGE: &str = "ameth ideas pin <id>";
-const ABANDON_USAGE: &str = "ameth ideas abandon <id>";
-const RESTORE_USAGE: &str = "ameth ideas restore <id>";
-
-const NEW_HELP: &str = "Create the next idea file.\n\nUsage:\n  ameth ideas new\n";
-const LIST_HELP: &str = "List active ideas.\n\nUsage:\n  ameth ideas list\n";
-const SHOW_HELP: &str = "Display an idea by ID, or the pinned idea when no ID is given.\n\nUsage:\n  ameth ideas show [id]\n";
-const PIN_HELP: &str = "Pin an idea ID for quick access.\n\nUsage:\n  ameth ideas pin <id>\n";
-const ABANDON_HELP: &str =
-    "Move an active idea into ideas/abandoned/.\n\nUsage:\n  ameth ideas abandon <id>\n";
-const RESTORE_HELP: &str =
-    "Move an abandoned idea back into ideas/.\n\nUsage:\n  ameth ideas restore <id>\n";
 
 const IDEA_TEMPLATE: &str = "## Abstract\n\n## Content\n";
 const AMETH_TOML_FILE_NAME: &str = "Ameth.toml";
 const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
-pub fn run(args: Vec<OsString>) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{HELP}");
-        return Ok(());
-    }
+#[derive(Args, Debug)]
+#[command(
+    about = "Manage idea files",
+    after_help = "Notes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Bare `ameth ideas` prints this help when no pinned idea is set."
+)]
+pub struct IdeasArgs {
+    #[command(subcommand)]
+    command: Option<IdeasCommand>,
+}
 
-    if args.is_empty() {
-        return run_default();
-    }
+#[derive(Debug, Subcommand)]
+enum IdeasCommand {
+    #[command(about = "Create the next idea file")]
+    New,
+    #[command(about = "List active ideas")]
+    List,
+    #[command(about = "Display an idea by ID, or the pinned idea when no ID is given")]
+    Show(ShowArgs),
+    #[command(about = "Pin an idea ID for quick access")]
+    Pin(IdeaIdArgs),
+    #[command(about = "Move an active idea into ideas/abandoned/")]
+    Abandon(IdeaIdArgs),
+    #[command(about = "Move an abandoned idea back into ideas/")]
+    Restore(IdeaIdArgs),
+}
 
-    let subcommand = args[0]
-        .to_str()
-        .ok_or_else(|| "subcommand must be valid UTF-8".to_string())?;
+#[derive(Args, Debug)]
+struct ShowArgs {
+    #[arg(value_name = "ID", value_parser = parse_idea_id)]
+    id: Option<u32>,
+}
 
-    match subcommand {
-        "new" => run_new(&args[1..]),
-        "list" => run_list(&args[1..]),
-        "show" => run_show(&args[1..]),
-        "pin" => run_pin(&args[1..]),
-        "abandon" => run_abandon(&args[1..]),
-        "restore" => run_restore(&args[1..]),
-        _ => Err(format!("invalid arguments\n\nUsage:\n  {USAGE}")),
+#[derive(Args, Debug)]
+struct IdeaIdArgs {
+    #[arg(value_name = "ID", value_parser = parse_idea_id)]
+    id: u32,
+}
+
+pub fn run(args: IdeasArgs) -> Result<(), String> {
+    match args.command {
+        None => run_default(),
+        Some(IdeasCommand::New) => run_new(),
+        Some(IdeasCommand::List) => run_list(),
+        Some(IdeasCommand::Show(args)) => run_show(args.id),
+        Some(IdeasCommand::Pin(args)) => run_pin(args.id),
+        Some(IdeasCommand::Abandon(args)) => run_abandon(args.id),
+        Some(IdeasCommand::Restore(args)) => run_restore(args.id),
     }
 }
 
 fn run_default() -> Result<(), String> {
     let Ok(project) = IdeasProject::load() else {
-        print!("{HELP}");
+        println!("{}", ideas_help());
         return Ok(());
     };
 
     let Some(id) = read_pinned_id(&project)? else {
-        print!("{HELP}");
+        println!("{}", ideas_help());
         return Ok(());
     };
 
     show_idea(&project, id)
 }
 
-fn run_new(args: &[OsString]) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{NEW_HELP}");
-        return Ok(());
-    }
-
-    if !args.is_empty() {
-        return Err(format!("invalid arguments\n\nUsage:\n  {NEW_USAGE}"));
-    }
-
+fn run_new() -> Result<(), String> {
     let project = IdeasProject::load()?;
     let next_id = next_idea_id(&project)?;
     let path = project.ideas_dir.join(idea_file_name(next_id));
@@ -89,16 +86,7 @@ fn run_new(args: &[OsString]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_list(args: &[OsString]) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{LIST_HELP}");
-        return Ok(());
-    }
-
-    if !args.is_empty() {
-        return Err(format!("invalid arguments\n\nUsage:\n  {LIST_USAGE}"));
-    }
-
+fn run_list() -> Result<(), String> {
     let project = IdeasProject::load()?;
     let ideas = read_idea_directory(&project.ideas_dir)?;
 
@@ -122,19 +110,10 @@ fn run_list(args: &[OsString]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_show(args: &[OsString]) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{SHOW_HELP}");
-        return Ok(());
-    }
-
-    if args.len() > 1 {
-        return Err(format!("invalid arguments\n\nUsage:\n  {SHOW_USAGE}"));
-    }
-
+fn run_show(id: Option<u32>) -> Result<(), String> {
     let project = IdeasProject::load()?;
-    let id = match args.first() {
-        Some(argument) => parse_idea_id_argument(argument)?,
+    let id = match id {
+        Some(id) => id,
         None => match read_pinned_id(&project)? {
             Some(id) => id,
             None => return Err("no pinned idea set".to_string()),
@@ -144,18 +123,8 @@ fn run_show(args: &[OsString]) -> Result<(), String> {
     show_idea(&project, id)
 }
 
-fn run_pin(args: &[OsString]) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{PIN_HELP}");
-        return Ok(());
-    }
-
-    if args.len() != 1 {
-        return Err(format!("invalid arguments\n\nUsage:\n  {PIN_USAGE}"));
-    }
-
+fn run_pin(id: u32) -> Result<(), String> {
     let project = IdeasProject::load()?;
-    let id = parse_idea_id_argument(&args[0])?;
 
     read_idea_markdown(&project, id)?;
     write_pinned_id(&project, id)?;
@@ -164,18 +133,8 @@ fn run_pin(args: &[OsString]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_abandon(args: &[OsString]) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{ABANDON_HELP}");
-        return Ok(());
-    }
-
-    if args.len() != 1 {
-        return Err(format!("invalid arguments\n\nUsage:\n  {ABANDON_USAGE}"));
-    }
-
+fn run_abandon(id: u32) -> Result<(), String> {
     let project = IdeasProject::load()?;
-    let id = parse_idea_id_argument(&args[0])?;
     move_idea(
         id,
         &project.ideas_dir.join(idea_file_name(id)),
@@ -188,18 +147,8 @@ fn run_abandon(args: &[OsString]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_restore(args: &[OsString]) -> Result<(), String> {
-    if args.len() == 1 && is_help_flag(&args[0]) {
-        print!("{RESTORE_HELP}");
-        return Ok(());
-    }
-
-    if args.len() != 1 {
-        return Err(format!("invalid arguments\n\nUsage:\n  {RESTORE_USAGE}"));
-    }
-
+fn run_restore(id: u32) -> Result<(), String> {
     let project = IdeasProject::load()?;
-    let id = parse_idea_id_argument(&args[0])?;
     move_idea(
         id,
         &project.abandoned_dir.join(idea_file_name(id)),
@@ -356,14 +305,7 @@ fn read_ameth_toml(path: &Path) -> Result<DocumentMut, String> {
         .map_err(|error| format!("failed to parse {}: {error}", path.display()))
 }
 
-fn is_help_flag(argument: &OsString) -> bool {
-    argument == "--help" || argument == "-h"
-}
-
-fn parse_idea_id_argument(argument: &OsString) -> Result<u32, String> {
-    let raw = argument
-        .to_str()
-        .ok_or_else(|| "idea id must be valid UTF-8".to_string())?;
+fn parse_idea_id(raw: &str) -> Result<u32, String> {
     let id = raw
         .parse::<u32>()
         .map_err(|_| "idea id must be a positive integer".to_string())?;
@@ -373,6 +315,18 @@ fn parse_idea_id_argument(argument: &OsString) -> Result<u32, String> {
     }
 
     Ok(id)
+}
+
+fn ideas_help() -> String {
+    let mut command = Command::new("ideas")
+        .bin_name("ameth ideas")
+        .about("Manage idea files")
+        .after_help(
+            "Notes:\n  Bare `ameth ideas` shows the pinned idea when one is set.\n  Bare `ameth ideas` prints this help when no pinned idea is set.",
+        );
+    command = IdeasCommand::augment_subcommands(command);
+
+    command.render_long_help().to_string()
 }
 
 fn next_idea_id(project: &IdeasProject) -> Result<u32, String> {
