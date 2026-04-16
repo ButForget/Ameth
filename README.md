@@ -7,7 +7,9 @@ Ameth is an early-stage Rust CLI for organizing research work so humans and LLMs
 This repository is still in very early development.
 
 - Project initialization is implemented.
+
 - The `ideas` command namespace is implemented for idea creation, listing, display, pin, abandon, and restore flows.
+
 - `solutions/` and `logs/` are now created as part of the managed project layout.
 
 ## Why Ameth?
