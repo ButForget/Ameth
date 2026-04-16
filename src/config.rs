@@ -25,9 +25,30 @@ impl AmethConfig {
 
         let content = fs::read_to_string(path)
             .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
-        let mut table = toml::from_str::<toml::Table>(&content)
+        let table = toml::from_str::<toml::Table>(&content)
             .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
 
+        Self::from_table(table, path)
+    }
+
+    pub fn save(&self, path: &Path) -> Result<(), String> {
+        let table = self.to_table(path)?;
+        let content = toml::to_string(&table)
+            .map_err(|error| format!("failed to serialize {}: {error}", path.display()))?;
+
+        fs::write(path, content)
+            .map_err(|error| format!("failed to write {}: {error}", path.display()))
+    }
+
+    pub fn set_value(&mut self, key: &str, value: toml::Value, path: &Path) -> Result<(), String> {
+        let mut table = self.to_table(path)?;
+        set_table_value(&mut table, key, value)?;
+        *self = Self::from_table(table, path)?;
+
+        Ok(())
+    }
+
+    fn from_table(mut table: toml::Table, path: &Path) -> Result<Self, String> {
         let editor = match table.remove("editor") {
             None => None,
             Some(value) => Some(EditorConfig::from_toml(value, path)?),
@@ -51,7 +72,7 @@ impl AmethConfig {
         })
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), String> {
+    fn to_table(&self, path: &Path) -> Result<toml::Table, String> {
         let mut table = toml::Table::new();
 
         for (key, value) in &self.extra {
@@ -69,11 +90,7 @@ impl AmethConfig {
         };
         table.insert("ideas".to_string(), toml::Value::Table(ideas_table));
 
-        let content = toml::to_string(&table)
-            .map_err(|error| format!("failed to serialize {}: {error}", path.display()))?;
-
-        fs::write(path, content)
-            .map_err(|error| format!("failed to write {}: {error}", path.display()))
+        Ok(table)
     }
 
     pub fn pinned_id(&self) -> Option<u32> {
@@ -90,6 +107,13 @@ impl AmethConfig {
         let editor = self.editor.as_ref()?;
         Some((editor.program(), editor.args()))
     }
+}
+
+pub fn parse_config_value(raw: &str) -> toml::Value {
+    toml::from_str::<toml::Table>(&format!("value = {raw}"))
+        .ok()
+        .and_then(|mut table| table.remove("value"))
+        .unwrap_or_else(|| toml::Value::String(raw.to_string()))
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -180,4 +204,40 @@ where
         }
         Some(_) => Err(D::Error::custom("invalid ideas.pinned value")),
     }
+}
+
+fn set_table_value(table: &mut toml::Table, key: &str, value: toml::Value) -> Result<(), String> {
+    let parts = parse_key_parts(key)?;
+    let (last, parents) = parts
+        .split_last()
+        .expect("config keys must contain at least one segment");
+    let mut current = table;
+
+    for part in parents {
+        if !current.contains_key(*part) {
+            current.insert((*part).to_string(), toml::Value::Table(toml::Table::new()));
+        }
+
+        let next = current
+            .get_mut(*part)
+            .expect("config keys remain available while descending");
+        let Some(next_table) = next.as_table_mut() else {
+            return Err(format!("cannot set `{key}`: `{part}` is not a table"));
+        };
+
+        current = next_table;
+    }
+
+    current.insert((*last).to_string(), value);
+    Ok(())
+}
+
+fn parse_key_parts(key: &str) -> Result<Vec<&str>, String> {
+    let parts = key.split('.').collect::<Vec<_>>();
+
+    if parts.is_empty() || parts.iter().any(|part| part.trim().is_empty()) {
+        return Err("config key must use non-empty dot-separated segments".to_string());
+    }
+
+    Ok(parts)
 }

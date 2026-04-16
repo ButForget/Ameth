@@ -5,6 +5,7 @@ Ameth is a Rust CLI for organizing research work so humans and LLMs can recover 
 ## Current Status
 
 - `ameth init <name> [path]` is implemented.
+- `ameth config <key> <value>` is implemented.
 - `ameth ideas` supports `new`, `list`, `show`, `pin`, `abandon`, and `restore`.
 - `ameth rq` supports `show` and `edit`.
 - `solutions/` and `logs/` are created as part of the managed layout, but their workflows are still intentionally undefined.
@@ -58,6 +59,7 @@ editor = ["code", "--wait"]
 
 - `editor` is required for interactive `ameth ideas new` and `ameth rq edit`.
 - `[ideas].pinned` stores the pinned idea ID for `ameth ideas show` and bare `ameth ideas`.
+- `ameth config <key> <value>` updates `Ameth.toml` and accepts dotted keys like `ideas.pinned`.
 
 `ResearchQuestion.md` lives at the project root.
 
@@ -105,6 +107,7 @@ Top-level commands:
 ```bash
 ameth
 ameth init <name> [path]
+ameth config <key> <value>
 ameth ideas [command]
 ameth rq [command]
 ```
@@ -117,6 +120,9 @@ Behavior:
 - `[path]` is the parent directory and defaults to `.`.
 - `ameth init` fails if `[path]/<name>` already exists.
 - `ameth init` creates `Ameth.toml`, `ResearchQuestion.md`, and the managed directory layout.
+- `ameth config <key> <value>` updates `Ameth.toml` in the current project root.
+- `ameth config` parses `<value>` as TOML when possible and otherwise stores it as a string.
+- Dotted keys like `ideas.pinned` update nested config tables.
 
 ### `ameth ideas`
 
@@ -144,6 +150,7 @@ Behavior:
 - `src/main.rs` is the thin binary entrypoint.
 - `src/cli/` contains root CLI dispatch and whole-program help.
 - `src/commands/init.rs` implements project initialization.
+- `src/commands/config.rs` implements config updates.
 - `src/commands/ideas.rs` implements idea subcommand parsing and execution.
 - `src/commands/ideas/document.rs` defines the idea template and strict idea parser.
 - `src/commands/ideas/project.rs` handles idea-project file operations and pinned-id persistence.

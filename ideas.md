@@ -2,9 +2,9 @@
 
 ## Scope
 
-This document describes the current Ameth behavior for idea management and the root research-question file.
+This document describes the current Ameth behavior for project config, idea management, and the root research-question file.
 
-The command namespaces are `ameth ideas` and `ameth rq`.
+The command namespaces are `ameth config`, `ameth ideas`, and `ameth rq`.
 
 These commands operate on the current working directory and expect to run from an initialized Ameth project root.
 
@@ -57,6 +57,7 @@ Rules:
 - The first editor entry is the program name.
 - Interactive `ameth ideas new` and `ameth rq edit` require `editor` to be configured.
 - `[ideas].pinned` stores the pinned idea ID as a positive integer.
+- `ameth config <key> <value>` updates `Ameth.toml`, accepts dotted keys like `ideas.pinned`, parses TOML values when possible, and otherwise stores the raw value as a string.
 
 ## Research Question File
 
@@ -119,6 +120,13 @@ Parser rules:
 - Content must belong to either `Abstract` or `Content`.
 
 ## Current Command Behavior
+
+### `ameth config`
+
+- `ameth config <key> <value>` updates `Ameth.toml` in the current project root.
+- Dotted keys like `ideas.pinned` update nested config tables.
+- `<value>` is parsed as TOML when possible, so arrays like `["code", "--wait"]` and integers like `4` are stored with their TOML types.
+- Values that are not valid TOML literals are stored as strings.
 
 ### `ameth ideas`
 
