@@ -6,9 +6,9 @@ use std::path::Path;
 
 pub const AMETH_TOML_FILE_NAME: &str = "Ameth.toml";
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default)]
 pub struct AmethConfig {
-    #[serde(flatten)]
+    editor: Option<EditorConfig>,
     extra: BTreeMap<String, toml::Value>,
     ideas: IdeasConfig,
 }
@@ -28,6 +28,11 @@ impl AmethConfig {
         let mut table = toml::from_str::<toml::Table>(&content)
             .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
 
+        let editor = match table.remove("editor") {
+            None => None,
+            Some(value) => Some(EditorConfig::from_toml(value, path)?),
+        };
+
         let ideas = match table.remove("ideas") {
             None => IdeasConfig::default(),
             Some(toml::Value::Table(ideas_table)) => {
@@ -40,6 +45,7 @@ impl AmethConfig {
         };
 
         Ok(Self {
+            editor,
             extra: table.into_iter().collect(),
             ideas,
         })
@@ -50,6 +56,10 @@ impl AmethConfig {
 
         for (key, value) in &self.extra {
             table.insert(key.clone(), value.clone());
+        }
+
+        if let Some(editor) = &self.editor {
+            table.insert("editor".to_string(), editor.to_toml_value());
         }
 
         let ideas_value = toml::Value::try_from(&self.ideas)
@@ -74,6 +84,78 @@ impl AmethConfig {
         self.ideas.pinned = Some(
             NonZeroU32::new(id).expect("idea ids are validated before being written to config"),
         );
+    }
+
+    pub fn editor_command(&self) -> Option<(&str, &[String])> {
+        let editor = self.editor.as_ref()?;
+        Some((editor.program(), editor.args()))
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct EditorConfig {
+    parts: Vec<String>,
+}
+
+impl EditorConfig {
+    fn from_toml(value: toml::Value, path: &Path) -> Result<Self, String> {
+        let mut parts = match value {
+            toml::Value::String(command) => vec![command.trim().to_string()],
+            toml::Value::Array(values) => {
+                let mut parts = Vec::new();
+
+                for value in values {
+                    let toml::Value::String(part) = value else {
+                        return Err(format!(
+                            "invalid root-level `editor` in {}; expected a string or array of strings",
+                            path.display()
+                        ));
+                    };
+
+                    parts.push(part);
+                }
+
+                parts
+            }
+            _ => {
+                return Err(format!(
+                    "invalid root-level `editor` in {}; expected a string or array of strings",
+                    path.display()
+                ));
+            }
+        };
+
+        if parts.is_empty() || parts[0].trim().is_empty() {
+            return Err(format!(
+                "invalid root-level `editor` in {}; editor command cannot be empty",
+                path.display()
+            ));
+        }
+
+        parts[0] = parts[0].trim().to_string();
+
+        Ok(Self { parts })
+    }
+
+    fn to_toml_value(&self) -> toml::Value {
+        if self.parts.len() == 1 {
+            return toml::Value::String(self.parts[0].clone());
+        }
+
+        toml::Value::Array(
+            self.parts
+                .iter()
+                .map(|part| toml::Value::String(part.clone()))
+                .collect(),
+        )
+    }
+
+    fn program(&self) -> &str {
+        &self.parts[0]
+    }
+
+    fn args(&self) -> &[String] {
+        &self.parts[1..]
     }
 }
 

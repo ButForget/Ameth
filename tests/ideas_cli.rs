@@ -32,8 +32,9 @@ fn init_creates_the_full_ideas_project_layout() {
 }
 
 #[test]
-fn ideas_new_creates_the_first_idea_template() {
+fn ideas_new_with_configured_editor_creates_the_first_idea_template() {
     let (_workspace, project_root) = init_project("demo");
+    configure_editor(&project_root, "true");
 
     command_in(&project_root)
         .args(["ideas", "new"])
@@ -65,13 +66,54 @@ fn ideas_new_uses_the_max_id_from_active_and_abandoned_ideas() {
     );
 
     command_in(&project_root)
-        .args(["ideas", "new"])
+        .args([
+            "ideas",
+            "new",
+            "--abs",
+            "New summary",
+            "--ctt",
+            "New content",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("idea-0008.md"));
 
-    assert!(project_root.join("ideas/idea-0008.md").is_file());
+    assert_eq!(
+        fs::read_to_string(project_root.join("ideas/idea-0008.md"))
+            .expect("idea file should exist"),
+        idea_markdown("New summary", "New content")
+    );
     assert!(!project_root.join("ideas/idea-0003.md").exists());
+}
+
+#[test]
+fn ideas_new_prefills_partial_template_before_opening_editor() {
+    let (_workspace, project_root) = init_project("demo");
+    configure_editor(&project_root, "true");
+
+    command_in(&project_root)
+        .args(["ideas", "new", "--abs", "Partial summary"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("idea-0001.md"))
+        .stderr(predicate::str::is_empty());
+
+    assert_eq!(
+        fs::read_to_string(project_root.join("ideas/idea-0001.md"))
+            .expect("idea file should exist"),
+        "## Abstract\n\nPartial summary\n\n## Content\n"
+    );
+}
+
+#[test]
+fn ideas_new_requires_editor_config_when_fields_are_omitted() {
+    let (_workspace, project_root) = init_project("demo");
+
+    command_in(&project_root)
+        .args(["ideas", "new", "--abs", "Partial summary"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("missing root-level `editor`"));
 }
 
 #[test]
@@ -551,6 +593,14 @@ fn command_in(directory: &Path) -> Command {
     let mut command = Command::cargo_bin("ameth").expect("ameth binary should build");
     command.current_dir(directory);
     command
+}
+
+fn configure_editor(project_root: &Path, editor: &str) {
+    fs::write(
+        project_root.join("Ameth.toml"),
+        format!("editor = \"{editor}\"\n\n[ideas]\n"),
+    )
+    .expect("config file should be updated");
 }
 
 fn write_active_idea(project_root: &Path, id: u32, markdown: impl AsRef<str>) {

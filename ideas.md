@@ -6,7 +6,19 @@ This document defines the planned idea-management structure and file formats for
 
 The command namespace is `ameth ideas`.
 
-Idea pin metadata lives in the project root `Ameth.toml` file.
+Idea pin metadata and the default editor command live in the project root `Ameth.toml` file.
+
+Editor config is root-level because it can be reused by multiple workflows:
+
+```toml
+editor = "nvim"
+```
+
+Use an array when the editor needs fixed arguments:
+
+```toml
+editor = ["code", "--wait"]
+```
 
 ## Root Structure
 
@@ -114,7 +126,8 @@ Rules:
 
 Initial `ameth ideas` behavior should align with these files:
 
-- `ameth ideas new` creates the next `ideas/idea-000N.md` file using the required idea template.
+- `ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]` creates the next `ideas/idea-000N.md` file using the required idea template.
+- When either field is omitted, `ameth ideas new` opens the root-level `editor` from `Ameth.toml` after creating the template and waits for it to exit.
 - `ameth ideas list` parses active idea files and displays their IDs plus `Abstract` text.
 - `ameth ideas show <id>` parses and displays the selected idea.
 - `ameth ideas show` parses and displays the pinned idea.
