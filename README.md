@@ -79,7 +79,7 @@ This repo currently contains:
 ### Useful Commands
 
 ```bash
-cargo run -- demo
+cargo run -- init demo
 cargo test
 cargo fmt --check
 ```
@@ -91,7 +91,6 @@ Ameth currently supports project initialization and idea management with:
 ```bash
 ameth
 ameth init <name> [path]
-ameth <name> [path]
 ameth ideas [command]
 ```
 
@@ -101,7 +100,6 @@ Behavior:
 - `ameth init <name> [path]` initializes a project.
 - `<name>` becomes the new project directory name.
 - `[path]` is the parent directory and defaults to `.`.
-- `ameth <name> [path]` is an alias for `ameth init <name> [path]`.
 - The command fails if `[path]/<name>` already exists.
 - `ameth init` creates `Ameth.toml` for project metadata.
 - `ameth ideas new` creates the next `idea-000N.md` file.

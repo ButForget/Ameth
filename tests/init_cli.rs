@@ -26,7 +26,7 @@ fn init_creates_project_in_current_dir_when_path_is_omitted() -> Result<(), Box<
 
     Command::cargo_bin("ameth")?
         .current_dir(temp_dir.path())
-        .arg("demo")
+        .args(["init", "demo"])
         .assert()
         .success();
 
@@ -43,7 +43,7 @@ fn init_creates_project_under_explicit_parent_path() -> Result<(), Box<dyn Error
 
     Command::cargo_bin("ameth")?
         .current_dir(temp_dir.path())
-        .args(["demo", "workspace"])
+        .args(["init", "demo", "workspace"])
         .assert()
         .success();
 
@@ -62,7 +62,7 @@ fn init_fails_when_target_already_exists() -> Result<(), Box<dyn Error>> {
 
     Command::cargo_bin("ameth")?
         .current_dir(temp_dir.path())
-        .args(["demo", "workspace"])
+        .args(["init", "demo", "workspace"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("already exists"));
@@ -76,7 +76,7 @@ fn init_writes_problem_template() -> Result<(), Box<dyn Error>> {
 
     Command::cargo_bin("ameth")?
         .current_dir(temp_dir.path())
-        .arg("demo")
+        .args(["init", "demo"])
         .assert()
         .success();
 
@@ -94,7 +94,7 @@ fn init_rejects_invalid_name_with_path_separator() -> Result<(), Box<dyn Error>>
 
     Command::cargo_bin("ameth")?
         .current_dir(temp_dir.path())
-        .arg("foo/bar")
+        .args(["init", "foo/bar"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("path separator"));
@@ -108,7 +108,8 @@ fn init_shows_help() -> Result<(), Box<dyn Error>> {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ameth <name> [path]"));
+        .stdout(predicate::str::contains("Usage: ameth [COMMAND]"))
+        .stdout(predicate::str::contains("ameth init <NAME> [PATH]").not());
 
     Ok(())
 }

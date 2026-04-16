@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Current State
-- The repo now implements project bootstrap with `ameth <name> [path]` and the `ameth ideas` command namespace.
+- The repo now implements project bootstrap with `ameth init <name> [path]` and the `ameth ideas` command namespace.
 - `ameth init` now creates the full planned root layout, including `solutions/`, `logs/`, and `Ameth.toml`.
 - Idea management currently supports `new`, `list`, `show`, `pin`, `abandon`, and `restore`.
 
@@ -17,7 +17,6 @@
 - `cargo test`: runs the CLI integration tests for project initialization and currently passes.
 - `cargo fmt --check`: formatting check currently passes.
 - `cargo run --`: prints the whole-program help.
-- `cargo run -- demo`: creates a new `demo/` Ameth project in the current directory.
 - `cargo run -- init demo`: creates a new `demo/` Ameth project in the current directory.
 - `cargo run -- ideas --help`: prints the ideas command help.
 - `cargo run -- ideas new`: creates the next idea file in an initialized project.
@@ -26,7 +25,6 @@
 ## Practical Guidance
 - Keep `src/main.rs` minimal. Top-level wiring, subcommand registration, and I/O are allowed there, but subcommand business logic is not.
 - Each subcommand should live in its own file and own its own usage/help text, parse logic, and execution logic.
-- `ameth <name> [path]` is the default alias for `ameth init <name> [path]`.
 - Bare `ameth` should print the introduction and root help for the whole program.
 - `ameth ideas` owns idea-file creation, listing, display, pinning, and archive/restore moves under `ideas/`.
 - Do not read files under `tests/` before a verification failure. Implement from the user request and source first, then inspect test code only after the code or test run fails.
