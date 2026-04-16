@@ -1,12 +1,11 @@
 use crate::config::{AMETH_TOML_FILE_NAME, AmethConfig};
-use clap::{Args, Command, Subcommand};
+use clap::{Args, Command as ClapCommand, Subcommand};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-const IDEA_TEMPLATE: &str = "## Abstract\n\n## Content\n";
+use std::process::Command;
 
 #[derive(Args, Debug)]
 #[command(
@@ -20,8 +19,12 @@ pub struct IdeasArgs {
 
 #[derive(Debug, Subcommand)]
 enum IdeasCommand {
-    #[command(about = "Create the next idea file")]
-    New,
+    #[command(
+        about = "Create the next idea file",
+        override_usage = "ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]",
+        after_help = "When either field is omitted, Ameth opens the root-level `editor` configured in Ameth.toml."
+    )]
+    New(NewArgs),
     #[command(about = "List active ideas")]
     List,
     #[command(about = "Display an idea by ID, or the pinned idea when no ID is given")]
@@ -32,6 +35,15 @@ enum IdeasCommand {
     Abandon(IdeaIdArgs),
     #[command(about = "Move an abandoned idea back into ideas/")]
     Restore(IdeaIdArgs),
+}
+
+#[derive(Args, Debug)]
+struct NewArgs {
+    #[arg(long = "abs", value_name = "ABSTRACT")]
+    abstract_text: Option<String>,
+
+    #[arg(long = "ctt", value_name = "CONTENT")]
+    content_text: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -49,7 +61,7 @@ struct IdeaIdArgs {
 pub fn run(args: IdeasArgs) -> Result<(), String> {
     match args.command {
         None => run_default(),
-        Some(IdeasCommand::New) => run_new(),
+        Some(IdeasCommand::New(args)) => run_new(args),
         Some(IdeasCommand::List) => run_list(),
         Some(IdeasCommand::Show(args)) => run_show(args.id),
         Some(IdeasCommand::Pin(args)) => run_pin(args.id),
@@ -72,15 +84,75 @@ fn run_default() -> Result<(), String> {
     show_idea(&project, id)
 }
 
-fn run_new() -> Result<(), String> {
+fn run_new(args: NewArgs) -> Result<(), String> {
     let project = IdeasProject::load()?;
     let next_id = next_idea_id(&project)?;
     let path = project.ideas_dir.join(idea_file_name(next_id));
+    let should_open_editor = args.abstract_text.is_none() || args.content_text.is_none();
+    let template = idea_template(args.abstract_text.as_deref(), args.content_text.as_deref());
 
-    fs::write(&path, IDEA_TEMPLATE)
+    fs::write(&path, template)
         .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
 
     println!("Created {}", path.display());
+
+    if should_open_editor {
+        open_configured_editor(&project, &path)?;
+    }
+
+    Ok(())
+}
+
+fn idea_template(abstract_text: Option<&str>, content_text: Option<&str>) -> String {
+    let mut markdown = String::from("## Abstract\n\n");
+
+    if let Some(text) = abstract_text.filter(|text| !text.is_empty()) {
+        markdown.push_str(text);
+        if !text.ends_with('\n') {
+            markdown.push('\n');
+        }
+        markdown.push('\n');
+    }
+
+    markdown.push_str("## Content\n");
+
+    if let Some(text) = content_text.filter(|text| !text.is_empty()) {
+        markdown.push('\n');
+        markdown.push_str(text);
+        if !text.ends_with('\n') {
+            markdown.push('\n');
+        }
+    }
+
+    markdown
+}
+
+fn open_configured_editor(project: &IdeasProject, path: &Path) -> Result<(), String> {
+    let config = AmethConfig::load_or_default(&project.config_path)?;
+    let (program, args) = config.editor_command().ok_or_else(|| {
+        format!(
+            "missing root-level `editor` in {}; configure it before using interactive `ameth ideas new`",
+            project.config_path.display()
+        )
+    })?;
+
+    let status = Command::new(program)
+        .args(args)
+        .arg(path)
+        .status()
+        .map_err(|error| {
+            format!(
+                "failed to launch editor `{program}` for {}: {error}",
+                path.display()
+            )
+        })?;
+
+    if !status.success() {
+        return Err(format!(
+            "editor `{program}` exited unsuccessfully: {status}"
+        ));
+    }
+
     Ok(())
 }
 
@@ -255,7 +327,7 @@ fn parse_idea_id(raw: &str) -> Result<u32, String> {
 }
 
 fn ideas_help() -> String {
-    let mut command = Command::new("ideas")
+    let mut command = ClapCommand::new("ideas")
         .bin_name("ameth ideas")
         .about("Manage idea files")
         .after_help(
@@ -652,7 +724,8 @@ fn event_has_non_whitespace_text(event: &Event<'_>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        ProblemSection, parse_idea_document, parse_idea_id_from_path, parse_problem_document,
+        ProblemSection, idea_template, parse_idea_document, parse_idea_id_from_path,
+        parse_problem_document,
     };
     use std::collections::BTreeMap;
     use std::path::Path;
@@ -703,6 +776,19 @@ mod tests {
 
         assert_eq!(document.abstract_text, "Short summary of the idea.");
         assert!(document.content_text.contains("Main idea text."));
+    }
+
+    #[test]
+    fn idea_template_accepts_empty_sections() {
+        assert_eq!(idea_template(None, None), "## Abstract\n\n## Content\n");
+    }
+
+    #[test]
+    fn idea_template_fills_provided_sections() {
+        assert_eq!(
+            idea_template(Some("Short summary."), Some("Detailed content.")),
+            "## Abstract\n\nShort summary.\n\n## Content\n\nDetailed content.\n"
+        );
     }
 
     #[test]

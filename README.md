@@ -39,7 +39,7 @@ The `ideas/` directory stores the research problem and raw idea documents.
 - `ideas/Problem.md` is the structured anchor for the research problem.
 - Idea files follow a naming pattern like `idea-0001.md`.
 - Abandoned ideas go under `ideas/abandoned/`.
-- `Ameth.toml` stores project metadata including the pinned idea ID.
+- `Ameth.toml` stores project metadata including the root editor command and pinned idea ID.
 - `Problem.md` uses fixed machine-parseable sections: `Abstract`, `Goal`, `Constraints`, and `Open Questions`.
 - Idea files use fixed machine-parseable sections: `Abstract` and `Content`.
 - Nested headings are allowed inside the fixed sections, but only at level 3 or deeper.
@@ -102,7 +102,9 @@ Behavior:
 - `[path]` is the parent directory and defaults to `.`.
 - The command fails if `[path]/<name>` already exists.
 - `ameth init` creates `Ameth.toml` for project metadata.
-- `ameth ideas new` creates the next `idea-000N.md` file.
+- `ameth ideas new [--abs <ABSTRACT>] [--ctt <CONTENT>]` creates the next `idea-000N.md` file.
+- If either idea field is omitted, `ameth ideas new` opens the root-level `editor` configured in `Ameth.toml` after writing the template.
+- `editor = "nvim"` configures a simple editor command; `editor = ["code", "--wait"]` configures an editor plus fixed arguments.
 - `ameth ideas list` lists active ideas and their abstract text.
 - `ameth ideas show <id>` shows an active or abandoned idea.
 - `ameth ideas show` shows the pinned idea.
