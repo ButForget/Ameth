@@ -6,6 +6,8 @@ This document defines the planned idea-management structure and file formats for
 
 The command namespace is `ameth ideas`.
 
+Idea pin metadata lives in the project root `Ameth.toml` file.
+
 ## Root Structure
 
 An Ameth-managed research project should contain these root directories:
@@ -115,8 +117,11 @@ Initial `ameth ideas` behavior should align with these files:
 - `ameth ideas new` creates the next `ideas/idea-000N.md` file using the required idea template.
 - `ameth ideas list` parses active idea files and displays their IDs plus `Abstract` text.
 - `ameth ideas show <id>` parses and displays the selected idea.
+- `ameth ideas show` parses and displays the pinned idea.
+- `ameth ideas pin <id>` records the pinned idea ID in `Ameth.toml`.
 - `ameth ideas abandon <id>` moves an idea file into `ideas/abandoned/`.
 - `ameth ideas restore <id>` moves an idea file back into `ideas/`.
+- Bare `ameth ideas` is an alias for `ameth ideas show` when an idea is pinned; otherwise it shows ideas help.
 
 ## Notes
 

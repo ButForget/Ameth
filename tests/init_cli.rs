@@ -11,10 +11,13 @@ fn assert_project_layout(project_root: &Path) {
     );
     assert!(project_root.join("ideas").is_dir());
     assert!(project_root.join("ideas/abandoned").is_dir());
+    assert!(project_root.join("solutions").is_dir());
+    assert!(project_root.join("logs").is_dir());
     assert!(project_root.join("relevants").is_dir());
     assert!(project_root.join("code").is_dir());
     assert!(project_root.join("experiments").is_dir());
     assert!(project_root.join("ideas/Problem.md").is_file());
+    assert!(project_root.join("Ameth.toml").is_file());
 }
 
 #[test]

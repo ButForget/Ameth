@@ -7,6 +7,7 @@ use tempfile::TempDir;
 const PROBLEM_TEMPLATE: &str =
     "# Problem\n\n## Abstract\n\n## Goal\n\n## Constraints\n\n## Open Questions\n";
 const IDEA_TEMPLATE: &str = "## Abstract\n\n## Content\n";
+const AMETH_TOML_TEMPLATE: &str = "[ideas]\n";
 
 #[test]
 fn init_creates_the_full_ideas_project_layout() {
@@ -19,6 +20,10 @@ fn init_creates_the_full_ideas_project_layout() {
     assert!(project_root.join("relevants").is_dir());
     assert!(project_root.join("code").is_dir());
     assert!(project_root.join("experiments").is_dir());
+    assert_eq!(
+        fs::read_to_string(project_root.join("Ameth.toml")).expect("config file should exist"),
+        AMETH_TOML_TEMPLATE
+    );
     assert_eq!(
         fs::read_to_string(project_root.join("ideas/Problem.md"))
             .expect("problem file should exist"),
@@ -175,6 +180,203 @@ fn ideas_show_reads_active_and_abandoned_ideas() {
 }
 
 #[test]
+fn ideas_show_without_an_id_uses_the_pinned_idea() {
+    let (_workspace, project_root) = init_project("demo");
+
+    write_active_idea(
+        &project_root,
+        4,
+        idea_markdown("Pinned summary", "Pinned content"),
+    );
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "4"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pinned idea 0004"));
+
+    command_in(&project_root)
+        .args(["ideas", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pinned summary"))
+        .stdout(predicate::str::contains("Pinned content"))
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn bare_ideas_uses_the_pinned_idea() {
+    let (_workspace, project_root) = init_project("demo");
+
+    write_active_idea(
+        &project_root,
+        5,
+        idea_markdown("Bare summary", "Bare content"),
+    );
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "5"])
+        .assert()
+        .success();
+
+    command_in(&project_root)
+        .args(["ideas"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Bare summary"))
+        .stdout(predicate::str::contains("Bare content"))
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn bare_ideas_shows_help_when_no_pin_exists() {
+    let (_workspace, project_root) = init_project("demo");
+
+    command_in(&project_root)
+        .args(["ideas"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Manage idea files."))
+        .stdout(predicate::str::contains("ameth ideas pin <id>"))
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn ideas_show_without_an_id_fails_when_no_pin_exists() {
+    let (_workspace, project_root) = init_project("demo");
+
+    command_in(&project_root)
+        .args(["ideas", "show"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error: no pinned idea set"));
+}
+
+#[test]
+fn ideas_pin_persists_an_active_idea_id() {
+    let (_workspace, project_root) = init_project("demo");
+
+    write_active_idea(
+        &project_root,
+        1,
+        idea_markdown("Pin active summary", "Pin active content"),
+    );
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pinned idea 0001"))
+        .stderr(predicate::str::is_empty());
+
+    assert!(
+        fs::read_to_string(project_root.join("Ameth.toml"))
+            .expect("config file should exist")
+            .contains("pinned = 1")
+    );
+}
+
+#[test]
+fn ideas_pin_accepts_an_abandoned_idea_id() {
+    let (_workspace, project_root) = init_project("demo");
+
+    write_abandoned_idea(
+        &project_root,
+        2,
+        idea_markdown("Pin abandoned summary", "Pin abandoned content"),
+    );
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pinned idea 0002"));
+
+    assert!(
+        fs::read_to_string(project_root.join("Ameth.toml"))
+            .expect("config file should exist")
+            .contains("pinned = 2")
+    );
+}
+
+#[test]
+fn ideas_pin_preserves_existing_ameth_toml_fields() {
+    let (_workspace, project_root) = init_project("demo");
+
+    write_active_idea(
+        &project_root,
+        3,
+        idea_markdown("Preserve summary", "Preserve content"),
+    );
+    fs::write(
+        project_root.join("Ameth.toml"),
+        "name = \"demo\"\n\n[ideas]\n",
+    )
+    .expect("config file should be overwritten for the test");
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "3"])
+        .assert()
+        .success();
+
+    let config =
+        fs::read_to_string(project_root.join("Ameth.toml")).expect("config file should exist");
+    assert!(config.contains("name = \"demo\""));
+    assert!(config.contains("pinned = 3"));
+}
+
+#[test]
+fn ideas_pin_fails_for_missing_ids() {
+    let (_workspace, project_root) = init_project("demo");
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "9"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error: idea 0009 not found"));
+}
+
+#[test]
+fn ideas_pin_fails_for_invalid_ids() {
+    let (_workspace, project_root) = init_project("demo");
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "abc"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "error: idea id must be a positive integer",
+        ));
+}
+
+#[test]
+fn ideas_pin_fails_outside_an_ameth_project() {
+    let workspace = TempDir::new().expect("temporary directory should be created");
+
+    command_in(workspace.path())
+        .args(["ideas", "pin", "1"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "error: current directory is not an Ameth project",
+        ));
+}
+
+#[test]
+fn stale_pinned_idea_ids_fail_cleanly() {
+    let (_workspace, project_root) = init_project("demo");
+
+    fs::write(project_root.join("Ameth.toml"), "[ideas]\npinned = 42\n")
+        .expect("config file should be updated");
+
+    command_in(&project_root)
+        .args(["ideas", "show"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error: idea 0042 not found"));
+}
+
+#[test]
 fn ideas_show_prefers_active_ideas_and_warns_when_ids_are_duplicated() {
     let (_workspace, project_root) = init_project("demo");
 
@@ -195,6 +397,37 @@ fn ideas_show_prefers_active_ideas_and_warns_when_ids_are_duplicated() {
         .success()
         .stdout(predicate::str::contains("Active duplicate summary"))
         .stdout(predicate::str::contains("Abandoned duplicate summary").not())
+        .stderr(predicate::str::contains(
+            "warning: idea 0007 exists in both",
+        ));
+}
+
+#[test]
+fn pinned_show_prefers_active_ideas_and_warns_when_ids_are_duplicated() {
+    let (_workspace, project_root) = init_project("demo");
+
+    write_active_idea(
+        &project_root,
+        7,
+        idea_markdown("Pinned active summary", "Pinned active content"),
+    );
+    write_abandoned_idea(
+        &project_root,
+        7,
+        idea_markdown("Pinned abandoned summary", "Pinned abandoned content"),
+    );
+
+    command_in(&project_root)
+        .args(["ideas", "pin", "7"])
+        .assert()
+        .success();
+
+    command_in(&project_root)
+        .args(["ideas", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pinned active summary"))
+        .stdout(predicate::str::contains("Pinned abandoned summary").not())
         .stderr(predicate::str::contains(
             "warning: idea 0007 exists in both",
         ));
